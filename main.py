@@ -36,6 +36,7 @@ import star_coding
 import star_git
 import star_automation
 import star_security
+import star_analytics
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1104,6 +1105,37 @@ def handle_security_command(command):
     return None
 
 
+# ------------------- ANALYTICS AGENT -------------------
+
+def handle_analytics_command(command):
+    text = command.lower().strip()
+
+    if text in {"analytics", "analytics summary", "usage stats", "usage statistics"}:
+        return star_analytics.format_summary(star_analytics.full_summary())
+
+    if text in {"top tools", "most used tools"}:
+        tools = star_analytics.command_summary()["top_tools"]
+        if not tools:
+            return "No tool usage yet."
+        return "Top tools: " + ", ".join(f"{item['tool']} ({item['count']})" for item in tools[:6]) + "."
+
+    if text in {"recent errors", "error summary"}:
+        errors = star_analytics.recent_errors(limit=6)
+        logs = errors["logs"]
+        if not logs and not errors["commands"]:
+            return "No recent errors found."
+        parts = [item["event"] for item in logs[:5]]
+        return "Recent issues: " + ", ".join(parts) + "."
+
+    if text in {"daily activity", "command activity"}:
+        days = star_analytics.daily_commands(limit=7)
+        if not days:
+            return "No command activity yet."
+        return "Daily activity: " + ", ".join(f"{item['day']}: {item['count']}" for item in days) + "."
+
+    return None
+
+
 def security_gate(command, tool, callback):
     result = star_security.classify_command(command, tool=tool)
     if not result["requires_confirmation"]:
@@ -1137,6 +1169,7 @@ TOOLS = {
     "git",
     "automation",
     "security",
+    "analytics",
     "none",
 }
 
@@ -1305,6 +1338,21 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in security_phrases):
         return "security"
 
+    analytics_phrases = [
+        "analytics",
+        "analytics summary",
+        "usage stats",
+        "usage statistics",
+        "top tools",
+        "most used tools",
+        "recent errors",
+        "error summary",
+        "daily activity",
+        "command activity",
+    ]
+    if any(text.startswith(phrase) or text == phrase for phrase in analytics_phrases):
+        return "analytics"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -1359,6 +1407,7 @@ coding
 git
 automation
 security
+analytics
 none
 
 Reply ONLY with one tool name.
@@ -1428,6 +1477,9 @@ def run_tool(tool, command):
 
     if tool == "security":
         return handle_security_command(command)
+
+    if tool == "analytics":
+        return handle_analytics_command(command)
 
     return None
 
@@ -1797,6 +1849,31 @@ def security_check(command: str, tool: Optional[str] = None):
 def security_audit(limit: int = 50):
     items = [item for item in storage.list_logs(limit=limit) if item["event"].startswith("security_")]
     return {"items": items}
+
+
+@app.get("/analytics")
+def analytics_summary():
+    return star_analytics.full_summary()
+
+
+@app.get("/analytics/commands")
+def analytics_commands():
+    return star_analytics.command_summary()
+
+
+@app.get("/analytics/daily")
+def analytics_daily(limit: int = 14):
+    return {"items": star_analytics.daily_commands(limit=limit)}
+
+
+@app.get("/analytics/tools")
+def analytics_tools():
+    return {"items": star_analytics.tool_breakdown()}
+
+
+@app.get("/analytics/errors")
+def analytics_errors(limit: int = 10):
+    return star_analytics.recent_errors(limit=limit)
 
 
 @app.get("/files/search")

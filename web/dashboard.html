@@ -22,6 +22,7 @@
           <button class="nav-item" data-view="chat">Chat</button>
           <button class="nav-item" data-view="memory">Memory</button>
           <button class="nav-item" data-view="tasks">Tasks</button>
+          <button class="nav-item" data-view="analytics">Analytics</button>
           <button class="nav-item" data-view="logs">Logs</button>
         </nav>
 
@@ -138,6 +139,40 @@
                 <button class="button" type="submit">Add Reminder</button>
               </form>
               <div class="list" id="reminderList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="analyticsView">
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Usage</h3>
+              </div>
+              <div class="system-grid" id="analyticsUsage"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Top Tools</h3>
+              </div>
+              <div class="list" id="analyticsTools"></div>
+            </section>
+          </div>
+
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Daily Activity</h3>
+              </div>
+              <div class="list dense" id="analyticsDaily"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Recent Issues</h3>
+              </div>
+              <div class="list dense" id="analyticsErrors"></div>
             </section>
           </div>
         </section>

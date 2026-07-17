@@ -7,6 +7,7 @@ const titles = {
   chat: ["Chat", "Send commands or natural language prompts to STAR."],
   memory: ["Memory", "View and edit what STAR remembers."],
   tasks: ["Tasks", "Tasks, reminders, and focus timer."],
+  analytics: ["Analytics", "Usage, tools, daily activity, and recent issues."],
   logs: ["Logs", "Command, app, and conversation history."],
 };
 
@@ -158,6 +159,41 @@ function renderLogs(items) {
     .join("");
 }
 
+function renderAnalytics(summary) {
+  const commands = summary.commands || {};
+  const productivity = summary.productivity || {};
+  const memory = summary.memory || {};
+  const usage = [
+    ["Commands", commands.total_commands ?? 0],
+    ["Success Rate", `${commands.success_rate ?? 0}%`],
+    ["Memory Items", memory.total_memory_items ?? 0],
+    ["Automation Runs", productivity.automation_runs ?? 0],
+  ];
+
+  $("#analyticsUsage").innerHTML = usage
+    .map(([label, value]) => `<div class="system-item"><b>${label}</b><span>${value}</span></div>`)
+    .join("");
+
+  $("#analyticsTools").innerHTML = (commands.top_tools || [])
+    .map((item) => `<div class="list-item"><b>${escapeHtml(item.tool)}</b><span>${item.count} command(s)</span></div>`)
+    .join("") || `<div class="list-item">No tool usage yet.</div>`;
+
+  $("#analyticsDaily").innerHTML = (summary.daily_commands || [])
+    .map((item) => `<div class="list-item"><b>${escapeHtml(item.day)}</b><span>${item.count} command(s)</span></div>`)
+    .join("") || `<div class="list-item">No daily activity yet.</div>`;
+
+  const logs = summary.recent_errors?.logs || [];
+  const commandsWithErrors = summary.recent_errors?.commands || [];
+  const issues = [
+    ...logs.map((item) => `${item.event}: ${item.details || ""}`),
+    ...commandsWithErrors.map((item) => `${item.tool}: ${item.command}`),
+  ];
+  $("#analyticsErrors").innerHTML = issues
+    .slice(0, 10)
+    .map((item) => `<div class="list-item">${escapeHtml(item)}</div>`)
+    .join("") || `<div class="list-item">No recent issues.</div>`;
+}
+
 function renderHistory(items) {
   $("#historyList").innerHTML = (items || [])
     .map(
@@ -189,7 +225,7 @@ async function sendCommand(command) {
 }
 
 async function refreshAll() {
-  const [health, settings, system, commands, memory, tasks, reminders, logs, history] = await Promise.all([
+  const [health, settings, system, commands, memory, tasks, reminders, logs, history, analytics] = await Promise.all([
     api("/health"),
     api("/settings"),
     api("/system"),
@@ -199,6 +235,7 @@ async function refreshAll() {
     api("/reminders?limit=20"),
     api("/logs?limit=30"),
     api("/history?limit=30"),
+    api("/analytics"),
   ]);
 
   renderMetrics(health);
@@ -210,6 +247,7 @@ async function refreshAll() {
   renderReminders(reminders.items);
   renderLogs(logs.items);
   renderHistory(history.items);
+  renderAnalytics(analytics);
 }
 
 function switchView(view) {

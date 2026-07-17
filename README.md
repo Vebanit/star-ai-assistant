@@ -29,6 +29,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Git helper for status, log, diff, branch, remotes, and confirmed commit/pull/push.
 - Smart automation for scheduled commands, simple workflows, due runs, and automation history.
 - Security mode, permission checks, confirmation gates, secret health, and audit logs.
+- Analytics for command success rate, top tools, daily activity, productivity, memory, and recent issues.
 - Google search command support.
 - Basic WhatsApp Web and Instagram DM automation through Selenium.
 
@@ -148,6 +149,11 @@ python wake_word.py
 - `security mode normal`
 - `check permission send whatsapp to Bajrangi message hello`
 - `audit logs`
+- `analytics summary`
+- `usage stats`
+- `top tools`
+- `daily activity`
+- `recent errors`
 - `check whatsapp`
 
 ## API Helpers
@@ -217,6 +223,11 @@ python wake_word.py
 - `POST /security/mode?mode=strict` - set security mode.
 - `GET /security/check?command=send whatsapp message` - classify command risk.
 - `GET /security/audit` - security audit logs.
+- `GET /analytics` - full analytics summary.
+- `GET /analytics/commands` - command totals and success rate.
+- `GET /analytics/daily` - daily command counts.
+- `GET /analytics/tools` - tool usage breakdown.
+- `GET /analytics/errors` - recent errors and warnings.
 - `POST /confirm` - confirm a pending risky action.
 - `POST /cancel` - cancel a pending risky action.
 
