@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>STAR Dashboard</title>
+    <link rel="stylesheet" href="/static/dashboard.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">S</div>
+          <div>
+            <h1>STAR</h1>
+            <p>Desktop assistant</p>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Dashboard sections">
+          <button class="nav-item active" data-view="overview">Overview</button>
+          <button class="nav-item" data-view="chat">Chat</button>
+          <button class="nav-item" data-view="memory">Memory</button>
+          <button class="nav-item" data-view="tasks">Tasks</button>
+          <button class="nav-item" data-view="logs">Logs</button>
+        </nav>
+
+        <section class="panel compact">
+          <div class="panel-title">Status</div>
+          <dl class="status-list" id="settingsList"></dl>
+        </section>
+      </aside>
+
+      <section class="content">
+        <header class="topbar">
+          <div>
+            <h2 id="viewTitle">Overview</h2>
+            <p id="viewSubtitle">System, assistant, and productivity snapshot.</p>
+          </div>
+          <div class="top-actions">
+            <button id="refreshBtn" class="button secondary">Refresh</button>
+            <button id="stopBtn" class="button danger">Stop Voice</button>
+          </div>
+        </header>
+
+        <section class="view active" id="overviewView">
+          <div class="metrics" id="metrics"></div>
+
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>System</h3>
+                <button class="button small secondary" id="briefingBtn">Briefing</button>
+              </div>
+              <div class="system-grid" id="systemGrid"></div>
+              <p class="briefing" id="briefingText"></p>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Quick Actions</h3>
+              </div>
+              <div class="quick-actions">
+                <button class="button secondary quick" data-command="system status">System Status</button>
+                <button class="button secondary quick" data-command="show tasks">Show Tasks</button>
+                <button class="button secondary quick" data-command="what do you remember">Memory</button>
+                <button class="button secondary quick" data-command="run compile check">Compile Check</button>
+                <button class="button secondary quick" data-command="git status">Git Status</button>
+                <button class="button secondary quick" data-command="daily briefing">Daily Briefing</button>
+              </div>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Recent Commands</h3>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Command</th>
+                    <th>Tool</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody id="commandsTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="chatView">
+          <section class="panel chat-panel">
+            <div class="chat-log" id="chatLog"></div>
+            <form class="chat-form" id="chatForm">
+              <input id="chatInput" type="text" autocomplete="off" placeholder="Ask STAR or run a command" />
+              <button class="button" type="submit">Send</button>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" id="memoryView">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Memory</h3>
+            </div>
+            <form class="inline-form" id="memoryForm">
+              <input id="memoryKey" type="text" placeholder="key" />
+              <input id="memoryValue" type="text" placeholder="value" />
+              <button class="button" type="submit">Save</button>
+            </form>
+            <div class="list" id="memoryList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="tasksView">
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Tasks</h3>
+              </div>
+              <form class="inline-form" id="taskForm">
+                <input id="taskTitle" type="text" placeholder="new task" />
+                <button class="button" type="submit">Add</button>
+              </form>
+              <div class="list" id="taskList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Reminders</h3>
+              </div>
+              <form class="stack-form" id="reminderForm">
+                <input id="reminderText" type="text" placeholder="reminder" />
+                <input id="reminderDue" type="text" placeholder="in 10 minutes" />
+                <button class="button" type="submit">Add Reminder</button>
+              </form>
+              <div class="list" id="reminderList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="logsView">
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Logs</h3>
+              </div>
+              <div class="list dense" id="logsList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Conversation</h3>
+              </div>
+              <div class="list dense" id="historyList"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/dashboard.js"></script>
+  </body>
+</html>

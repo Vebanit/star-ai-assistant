@@ -7,6 +7,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Wake word activation with Picovoice Porcupine.
 - Continuous speech recognition after wake word detection.
 - FastAPI backend with `/ask-star`, `/memory`, `/history`, `/commands`, `/logs`, `/settings`, `/stop`, and `/health`.
+- Web dashboard at `/dashboard` with chat, status, memory, tasks, reminders, logs, and command history.
 - Groq-powered assistant replies and action planning.
 - Edge TTS voice output.
 - Persistent SQLite memory in `star.db`.
@@ -57,7 +58,13 @@ PICOVOICE_ACCESS_KEY=your_picovoice_key
 uvicorn main:app --reload
 ```
 
-5. In another terminal, start wake word listening.
+5. Open the dashboard.
+
+```text
+http://127.0.0.1:8000/dashboard
+```
+
+6. In another terminal, start wake word listening.
 
 ```powershell
 python wake_word.py
@@ -130,6 +137,7 @@ python wake_word.py
 
 ## API Helpers
 
+- `GET /dashboard` - STAR web dashboard.
 - `GET /memory` - view memory with metadata.
 - `POST /memory?key=name&value=Bajrangi` - edit or add memory.
 - `DELETE /memory/name` - forget one memory item.

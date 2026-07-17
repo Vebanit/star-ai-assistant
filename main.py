@@ -15,6 +15,8 @@ import pyautogui
 from ddgs import DDGS
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from groq import Groq
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -37,10 +39,12 @@ import star_git
 BASE_DIR = Path(__file__).resolve().parent
 LEGACY_MEMORY_FILE = BASE_DIR / "star_memory.json"
 SPEAKER_FILE = BASE_DIR / "speaker.py"
+WEB_DIR = BASE_DIR / "web"
 
 load_dotenv(BASE_DIR / ".env")
 
 app = FastAPI(title="STAR Assistant")
+app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 client = Groq(api_key=os.getenv("GROQ_API_KEY")) if os.getenv("GROQ_API_KEY") else None
 
 current_process = None
@@ -1493,6 +1497,16 @@ User: {text}
 
 
 # ------------------- API ENDPOINTS -------------------
+
+@app.get("/")
+def root():
+    return RedirectResponse(url="/dashboard")
+
+
+@app.get("/dashboard")
+def dashboard():
+    return FileResponse(WEB_DIR / "dashboard.html")
+
 
 @app.get("/ask-star")
 def ask(q: str):
