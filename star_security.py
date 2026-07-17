@@ -6,12 +6,22 @@ import star_storage as storage
 
 DEFAULT_MODE = "normal"
 MODES = {"relaxed", "normal", "strict"}
-SECRET_KEYS = ["GROQ_API_KEY", "PICOVOICE_ACCESS_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"]
+SECRET_KEYS = [
+    "GROQ_API_KEY",
+    "PICOVOICE_ACCESS_KEY",
+    "GEMINI_API_KEY",
+    "OPENAI_API_KEY",
+    "EMAIL_ADDRESS",
+    "EMAIL_APP_PASSWORD",
+    "GMAIL_ADDRESS",
+    "GMAIL_APP_PASSWORD",
+]
 
 RISKY_PATTERNS = {
     "power": ["shutdown", "restart pc", "reboot", "sleep pc", "lock pc"],
     "git_write": ["git commit", "git push", "git pull"],
     "messaging": ["send whatsapp", "whatsapp message to", "send message to"],
+    "email": ["send email", "send mail", "delete email", "archive email"],
     "browser_download": ["download file"],
     "automation": ["run automations", "run due automations", "create workflow", "schedule command"],
     "memory_clear": ["clear memory", "clear my memory", "forget all memory"],
@@ -46,12 +56,12 @@ def classify_command(command, tool=None):
 
     mode = get_mode()
     if mode == "relaxed":
-        requires_confirmation = any(category in {"power", "git_write", "file_write", "memory_clear"} for category in matched)
+        requires_confirmation = any(category in {"power", "git_write", "file_write", "memory_clear", "email"} for category in matched)
     elif mode == "strict":
         requires_confirmation = True
     else:
         requires_confirmation = any(
-            category in {"power", "git_write", "messaging", "browser_download", "automation", "memory_clear", "file_write"}
+            category in {"power", "git_write", "messaging", "email", "browser_download", "automation", "memory_clear", "file_write"}
             for category in matched
         )
 

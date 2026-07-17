@@ -31,6 +31,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Security mode, permission checks, confirmation gates, secret health, and audit logs.
 - Analytics for command success rate, top tools, daily activity, productivity, memory, and recent issues.
 - Vision helper for screenshots, image analysis, OCR, QR/barcode scan, and image comparison.
+- Email helper for IMAP inbox, unread/search, SMTP send, archive, and delete.
 - Google search command support.
 - Basic WhatsApp Web and Instagram DM automation through Selenium.
 
@@ -54,6 +55,8 @@ pip install -r requirements.txt
 ```env
 GROQ_API_KEY=your_groq_key
 PICOVOICE_ACCESS_KEY=your_picovoice_key
+EMAIL_ADDRESS=your_email_address
+EMAIL_APP_PASSWORD=your_email_app_password
 ```
 
 4. Start the backend.
@@ -162,6 +165,13 @@ python wake_word.py
 - `ocr image screenshot_153709.png`
 - `scan qr qr.png`
 - `compare images first.png and second.png`
+- `email status`
+- `read emails`
+- `unread emails`
+- `search emails invoice`
+- `send email to friend@example.com subject Hello message Hi there`
+- `archive email 123`
+- `delete email 123`
 - `check whatsapp`
 
 ## API Helpers
@@ -243,6 +253,12 @@ python wake_word.py
 - `GET /vision/barcode?path=image.png` - scan barcode if decoder is available.
 - `GET /vision/screen` - screenshot plus image analysis and OCR attempt.
 - `GET /vision/compare?first=a.png&second=b.png` - compare two images.
+- `GET /email/status` - email configuration status.
+- `GET /email/inbox?limit=10&unread_only=false` - list inbox email summaries.
+- `GET /email/search?q=invoice` - search emails.
+- `POST /email/send?to=friend@example.com&subject=Hello&body=Hi` - send email.
+- `POST /email/123/archive` - archive one email by IMAP id.
+- `DELETE /email/123` - delete one email by IMAP id.
 - `POST /confirm` - confirm a pending risky action.
 - `POST /cancel` - cancel a pending risky action.
 
@@ -253,6 +269,7 @@ python wake_word.py
 - If `star_memory.json` exists from an older version, STAR imports it into SQLite on startup.
 - PDF reading needs `pypdf` or `PyPDF2`; OCR will need an OCR engine in a later batch.
 - OCR uses `pytesseract`, but Windows also needs the Tesseract OCR engine installed and available on PATH.
+- Email defaults to Gmail IMAP/SMTP. For Gmail, enable IMAP and use an app password in `.env`; never paste email passwords into chat.
 - WhatsApp send/search requires WhatsApp Web login and may need selector updates if WhatsApp changes its UI.
 - Security modes: `relaxed` confirms only highest-risk actions, `normal` confirms messaging/download/automation/power/git write actions, and `strict` confirms every recognized risky action.
 - Keep `.env` private.

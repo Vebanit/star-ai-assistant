@@ -38,6 +38,7 @@ import star_automation
 import star_security
 import star_analytics
 import star_vision
+import star_email
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -868,6 +869,120 @@ def handle_whatsapp_command(command):
     return check_whatsapp()
 
 
+def parse_email_send(text):
+    lower_text = text.lower()
+    if not lower_text.startswith(("send email to", "send mail to")):
+        return None
+
+    subject_marker = " subject "
+    message_markers = [" message ", " body ", " saying "]
+    if subject_marker not in lower_text:
+        return None
+
+    subject_index = lower_text.index(subject_marker)
+    to_value = text_after_any(text[:subject_index], ["send email to", "send mail to"]).strip()
+    remaining = text[subject_index + len(subject_marker):]
+    remaining_lower = remaining.lower()
+
+    message_index = None
+    marker_used = None
+    for marker in message_markers:
+        if marker in remaining_lower:
+            message_index = remaining_lower.index(marker)
+            marker_used = marker
+            break
+
+    if message_index is None:
+        return None
+
+    subject = remaining[:message_index].strip()
+    body = remaining[message_index + len(marker_used):].strip()
+    if not to_value or not subject or not body:
+        return None
+    return to_value, subject, body
+
+
+def handle_email_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text in {"email status", "mail status"}:
+        status = star_email.status()
+        if status["configured"]:
+            return f"Email is ready with {status['imap_host']} and {status['smtp_host']}."
+        return "Email is not configured. Add EMAIL_ADDRESS and EMAIL_APP_PASSWORD in .env."
+
+    if lower_text in {"read emails", "show emails", "inbox", "show inbox"}:
+        try:
+            return star_email.format_email_list(star_email.list_emails(limit=5))
+        except RuntimeError as exc:
+            return str(exc)
+        except Exception as exc:
+            storage.add_log("warning", "email_list_failed", str(exc))
+            return "Email inbox check failed."
+
+    if lower_text in {"unread emails", "show unread emails", "unread mail"}:
+        try:
+            return star_email.format_email_list(star_email.list_emails(limit=5, unread_only=True))
+        except RuntimeError as exc:
+            return str(exc)
+        except Exception as exc:
+            storage.add_log("warning", "email_unread_failed", str(exc))
+            return "Unread email check failed."
+
+    if lower_text.startswith(("search emails", "search mail")):
+        query = text_after_any(text, ["search emails", "search mail"]).strip()
+        if not query:
+            return "Tell me what to search in email."
+        try:
+            return star_email.format_email_list(star_email.search_emails(query, limit=5))
+        except RuntimeError as exc:
+            return str(exc)
+        except Exception as exc:
+            storage.add_log("warning", "email_search_failed", str(exc))
+            return "Email search failed."
+
+    parsed = parse_email_send(text)
+    if parsed:
+        to_value, subject, body = parsed
+        try:
+            result = star_email.send_email(to_value, subject, body)
+            return f"Email sent to {result['to']}."
+        except RuntimeError as exc:
+            return str(exc)
+        except Exception as exc:
+            storage.add_log("warning", "email_send_failed", str(exc))
+            return "Email send failed."
+
+    if lower_text.startswith("archive email"):
+        message_id = text_after_any(text, ["archive email"]).strip()
+        if not message_id:
+            return "Tell me which email id to archive."
+        try:
+            star_email.archive_email(message_id)
+            return f"Email {message_id} archived."
+        except RuntimeError as exc:
+            return str(exc)
+        except Exception as exc:
+            storage.add_log("warning", "email_archive_failed", str(exc))
+            return "Email archive failed."
+
+    if lower_text.startswith("delete email"):
+        message_id = text_after_any(text, ["delete email"]).strip()
+        if not message_id:
+            return "Tell me which email id to delete."
+        try:
+            star_email.delete_email(message_id)
+            return f"Email {message_id} deleted."
+        except RuntimeError as exc:
+            return str(exc)
+        except Exception as exc:
+            storage.add_log("warning", "email_delete_failed", str(exc))
+            return "Email delete failed."
+
+    return "Email commands: email status, read emails, unread emails, search emails invoice, send email to someone@example.com subject Hello message Hi."
+
+
 # ------------------- CODING + GIT AGENTS -------------------
 
 def handle_coding_command(command):
@@ -1227,6 +1342,7 @@ TOOLS = {
     "security",
     "analytics",
     "vision",
+    "email",
     "none",
 }
 
@@ -1430,6 +1546,26 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in vision_phrases):
         return "vision"
 
+    email_phrases = [
+        "email status",
+        "mail status",
+        "read emails",
+        "show emails",
+        "show inbox",
+        "inbox",
+        "unread emails",
+        "show unread emails",
+        "unread mail",
+        "search emails",
+        "search mail",
+        "send email to",
+        "send mail to",
+        "archive email",
+        "delete email",
+    ]
+    if any(text.startswith(phrase) or text == phrase for phrase in email_phrases):
+        return "email"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -1486,6 +1622,7 @@ automation
 security
 analytics
 vision
+email
 none
 
 Reply ONLY with one tool name.
@@ -1561,6 +1698,9 @@ def run_tool(tool, command):
 
     if tool == "vision":
         return handle_vision_command(command)
+
+    if tool == "email":
+        return handle_email_command(command)
 
     return None
 
@@ -1755,7 +1895,7 @@ def ask_star(user_text):
 
     tool = agent_brain(text)
     if tool != "none":
-        if tool in {"whatsapp", "browser", "automation"}:
+        if tool in {"whatsapp", "browser", "automation", "email"}:
             tool_reply = security_gate(text, tool, lambda: run_tool(tool, text))
         else:
             tool_reply = run_tool(tool, text)
@@ -1887,6 +2027,7 @@ def settings():
     return {
         "groq_configured": bool(client),
         "picovoice_configured": bool(os.getenv("PICOVOICE_ACCESS_KEY")),
+        "email_configured": star_email.is_configured(),
         "database": str(storage.DB_FILE),
         "wake_word_file_exists": (BASE_DIR / "Hello-STAR_en_windows_v4_0_0.ppn").exists(),
         "speaker_file_exists": SPEAKER_FILE.exists(),
@@ -1990,6 +2131,51 @@ def vision_screen():
 @app.get("/vision/compare")
 def vision_compare(first: str, second: str):
     return star_vision.compare_images(first, second)
+
+
+@app.get("/email/status")
+def email_status():
+    return star_email.status()
+
+
+@app.get("/email/inbox")
+def email_inbox(limit: int = 10, unread_only: bool = False):
+    try:
+        return {"items": star_email.list_emails(limit=limit, unread_only=unread_only)}
+    except RuntimeError as exc:
+        return {"error": str(exc), "items": []}
+
+
+@app.get("/email/search")
+def email_search(q: str, limit: int = 10):
+    try:
+        return {"items": star_email.search_emails(q, limit=limit)}
+    except RuntimeError as exc:
+        return {"error": str(exc), "items": []}
+
+
+@app.post("/email/send")
+def email_send(to: str, subject: str, body: str):
+    try:
+        return star_email.send_email(to, subject, body)
+    except RuntimeError as exc:
+        return {"error": str(exc), "status": "not_configured"}
+
+
+@app.post("/email/{message_id}/archive")
+def email_archive(message_id: str):
+    try:
+        return star_email.archive_email(message_id)
+    except RuntimeError as exc:
+        return {"error": str(exc), "status": "not_configured"}
+
+
+@app.delete("/email/{message_id}")
+def email_delete(message_id: str):
+    try:
+        return star_email.delete_email(message_id)
+    except RuntimeError as exc:
+        return {"error": str(exc), "status": "not_configured"}
 
 
 @app.get("/files/search")
