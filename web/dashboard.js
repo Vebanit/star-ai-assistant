@@ -46,6 +46,7 @@ function renderMetrics(health) {
     ["Memory", health.memory_items],
     ["Contacts", health.contacts],
     ["Snippets", health.snippets],
+    ["Finance", health.finance_transactions],
     ["Tasks", health.open_tasks],
     ["Reminders", health.open_reminders],
     ["Calendar", health.upcoming_calendar_events],

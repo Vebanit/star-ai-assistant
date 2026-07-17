@@ -116,6 +116,17 @@ def init_db():
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS finance_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                amount REAL NOT NULL,
+                category TEXT NOT NULL DEFAULT 'general',
+                note TEXT,
+                currency TEXT NOT NULL DEFAULT 'INR',
+                happened_at TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS automations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -155,6 +166,7 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_calendar_events_start ON calendar_events(starts_at, status);
             CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
             CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name);
+            CREATE INDEX IF NOT EXISTS idx_finance_happened ON finance_transactions(happened_at, kind, category);
             CREATE INDEX IF NOT EXISTS idx_automations_due ON automations(next_run_at, status);
             CREATE INDEX IF NOT EXISTS idx_automation_runs_id ON automation_runs(automation_id);
             """
@@ -333,6 +345,7 @@ def get_stats():
         upcoming_event_count = conn.execute("SELECT COUNT(*) AS count FROM calendar_events WHERE status = 'scheduled'").fetchone()["count"]
         contact_count = conn.execute("SELECT COUNT(*) AS count FROM contacts").fetchone()["count"]
         snippet_count = conn.execute("SELECT COUNT(*) AS count FROM snippets").fetchone()["count"]
+        finance_transaction_count = conn.execute("SELECT COUNT(*) AS count FROM finance_transactions").fetchone()["count"]
         active_automation_count = conn.execute("SELECT COUNT(*) AS count FROM automations WHERE status = 'active'").fetchone()["count"]
 
     return {
@@ -346,6 +359,7 @@ def get_stats():
         "upcoming_calendar_events": upcoming_event_count,
         "contacts": contact_count,
         "snippets": snippet_count,
+        "finance_transactions": finance_transaction_count,
         "active_automations": active_automation_count,
     }
 

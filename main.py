@@ -42,6 +42,7 @@ import star_email
 import star_calendar
 import star_contacts
 import star_clipboard
+import star_finance
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1193,6 +1194,55 @@ def handle_clipboard_command(command):
     return None
 
 
+# ------------------- FINANCE AGENT -------------------
+
+def handle_finance_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text in {"finance summary", "money summary", "expense summary", "monthly summary", "monthly finance"}:
+        return star_finance.format_summary(star_finance.summary())
+
+    if lower_text in {"show expenses", "list expenses", "monthly expenses", "recent expenses"}:
+        return star_finance.format_transactions(star_finance.list_transactions(kind="expense", limit=10))
+
+    if lower_text in {"show income", "list income", "recent income"}:
+        return star_finance.format_transactions(star_finance.list_transactions(kind="income", limit=10))
+
+    if lower_text in {"show transactions", "finance transactions", "recent transactions"}:
+        return star_finance.format_transactions(star_finance.list_transactions(limit=10))
+
+    if lower_text in {"expense categories", "spending categories", "category expenses"}:
+        categories = star_finance.category_summary(limit=8)
+        if not categories:
+            return "No expense categories found this month."
+        return "Expense categories: " + ", ".join(
+            f"{item['category']} {star_finance.format_money(item['total'])}" for item in categories
+        ) + "."
+
+    if lower_text.startswith(("add expense", "record expense", "expense ")):
+        payload = text_after_any(text, ["add expense", "record expense", "expense"]).strip()
+        result = star_finance.create_from_text("expense", payload)
+        if result.get("error"):
+            return result["error"]
+        return f"Expense {result['id']} added: {star_finance.format_money(result['amount'])} for {result['category']}."
+
+    if lower_text.startswith(("add income", "record income", "income ")):
+        payload = text_after_any(text, ["add income", "record income", "income"]).strip()
+        result = star_finance.create_from_text("income", payload)
+        if result.get("error"):
+            return result["error"]
+        return f"Income {result['id']} added: {star_finance.format_money(result['amount'])} for {result['category']}."
+
+    if lower_text.startswith(("delete transaction", "delete expense", "delete income")):
+        transaction_id = first_number(text)
+        if not transaction_id:
+            return "Tell me the transaction number to delete."
+        return "Transaction deleted." if star_finance.delete_transaction(transaction_id) else "Transaction not found."
+
+    return None
+
+
 # ------------------- CODING + GIT AGENTS -------------------
 
 def handle_coding_command(command):
@@ -1556,6 +1606,7 @@ TOOLS = {
     "calendar",
     "contacts",
     "clipboard",
+    "finance",
     "none",
 }
 
@@ -1849,6 +1900,38 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in clipboard_phrases):
         return "clipboard"
 
+    finance_phrases = [
+        "add expense",
+        "record expense",
+        "expense ",
+        "add income",
+        "record income",
+        "income ",
+        "finance summary",
+        "money summary",
+        "expense summary",
+        "monthly summary",
+        "monthly finance",
+        "show expenses",
+        "list expenses",
+        "monthly expenses",
+        "recent expenses",
+        "show income",
+        "list income",
+        "recent income",
+        "show transactions",
+        "finance transactions",
+        "recent transactions",
+        "expense categories",
+        "spending categories",
+        "category expenses",
+        "delete transaction",
+        "delete expense",
+        "delete income",
+    ]
+    if any(text.startswith(phrase) or text == phrase for phrase in finance_phrases):
+        return "finance"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -1909,6 +1992,7 @@ email
 calendar
 contacts
 clipboard
+finance
 none
 
 Reply ONLY with one tool name.
@@ -1996,6 +2080,9 @@ def run_tool(tool, command):
 
     if tool == "clipboard":
         return handle_clipboard_command(command)
+
+    if tool == "finance":
+        return handle_finance_command(command)
 
     return None
 
@@ -2627,6 +2714,41 @@ def snippets_paste(snippet_id: int):
 @app.delete("/snippets/{snippet_id}")
 def snippets_delete(snippet_id: int):
     return {"status": "deleted" if star_clipboard.delete_snippet(snippet_id) else "not_found", "id": snippet_id}
+
+
+@app.post("/finance/transactions")
+def finance_create(kind: str, amount: float, category: str = "general", note: Optional[str] = None, currency: str = "INR"):
+    transaction_id = star_finance.add_transaction(kind, amount, category=category, note=note, currency=currency)
+    return {"status": "saved" if transaction_id else "ignored", "id": transaction_id}
+
+
+@app.post("/finance/transactions/from-text")
+def finance_create_from_text(kind: str, text: str):
+    result = star_finance.create_from_text(kind.lower(), text)
+    if result.get("error"):
+        return {"status": "invalid_transaction", "error": result["error"]}
+    return {"status": "saved", **result}
+
+
+@app.get("/finance/transactions")
+def finance_transactions(limit: int = 50, kind: Optional[str] = None):
+    clean_kind = kind.lower() if kind else None
+    return {"items": star_finance.list_transactions(limit=limit, kind=clean_kind)}
+
+
+@app.get("/finance/summary")
+def finance_summary():
+    return star_finance.summary()
+
+
+@app.get("/finance/categories")
+def finance_categories(limit: int = 10):
+    return {"items": star_finance.category_summary(limit=limit)}
+
+
+@app.delete("/finance/transactions/{transaction_id}")
+def finance_delete(transaction_id: int):
+    return {"status": "deleted" if star_finance.delete_transaction(transaction_id) else "not_found", "id": transaction_id}
 
 
 @app.get("/files/search")

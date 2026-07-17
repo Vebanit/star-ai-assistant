@@ -25,6 +25,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Calendar events, today/tomorrow agenda, upcoming events, cancel, and delete.
 - Contacts/address book for saved names, email addresses, phone numbers, lookup, update, and delete.
 - Clipboard and snippets helper for copy/read/paste plus reusable text templates.
+- Finance tracker for income, expenses, category breakdowns, monthly balance, and transaction history.
 - Browser tab controls, Google/DuckDuckGo search, and file download helper.
 - Media controls for play/pause, next/previous, YouTube, Spotify, Netflix, and VLC.
 - WhatsApp chat search/send helpers through WhatsApp Web.
@@ -138,6 +139,13 @@ python wake_word.py
 - `copy snippet 1`
 - `paste snippet 1` then `confirm` or `cancel`
 - `delete snippet 1`
+- `add expense 250 for food note lunch`
+- `add income 5000 for salary`
+- `finance summary`
+- `monthly expenses`
+- `expense categories`
+- `show transactions`
+- `delete transaction 1`
 - `start pomodoro 25`
 - `pomodoro status`
 - `open website openai.com`
@@ -253,6 +261,12 @@ python wake_word.py
 - `POST /snippets/1/copy` - copy snippet content to clipboard.
 - `POST /snippets/1/paste` - paste snippet content into the active app.
 - `DELETE /snippets/1` - delete a snippet.
+- `POST /finance/transactions?kind=expense&amount=250&category=food` - save income or expense.
+- `POST /finance/transactions/from-text?kind=expense&text=250 for food note lunch` - save transaction from text.
+- `GET /finance/transactions` - list finance transactions.
+- `GET /finance/summary` - current month income, expense, and balance.
+- `GET /finance/categories` - current month expense categories.
+- `DELETE /finance/transactions/1` - delete a transaction.
 - `POST /pomodoro/start?minutes=25` - start Pomodoro.
 - `GET /pomodoro` - Pomodoro status.
 - `POST /browser/open?target=openai.com` - open website/search target.
