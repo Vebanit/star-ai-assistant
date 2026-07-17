@@ -23,6 +23,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Research search, latest news, weather lookup, Wikipedia-style lookup, and webpage summary.
 - Notes, tasks/to-do list, reminders, daily briefing, and Pomodoro timer.
 - Calendar events, today/tomorrow agenda, upcoming events, cancel, and delete.
+- Contacts/address book for saved names, email addresses, phone numbers, lookup, update, and delete.
 - Browser tab controls, Google/DuckDuckGo search, and file download helper.
 - Media controls for play/pause, next/previous, YouTube, Spotify, Netflix, and VLC.
 - WhatsApp chat search/send helpers through WhatsApp Web.
@@ -121,6 +122,12 @@ python wake_word.py
 - `upcoming events`
 - `cancel event 1`
 - `delete event 1`
+- `add contact Bajrangi email bajrangi@example.com phone +919999999999`
+- `show contacts`
+- `find contact Bajrangi`
+- `set contact email Bajrangi to bajrangi@example.com`
+- `set contact phone Bajrangi to +919999999999`
+- `delete contact 1`
 - `start pomodoro 25`
 - `pomodoro status`
 - `open website openai.com`
@@ -177,6 +184,7 @@ python wake_word.py
 - `unread emails`
 - `search emails invoice`
 - `send email to friend@example.com subject Hello message Hi there`
+- `send email to Bajrangi subject Hello message Hi there`
 - `archive email 123`
 - `delete email 123`
 - `check whatsapp`
@@ -219,6 +227,12 @@ python wake_word.py
 - `GET /calendar/agenda?day=today` - today or tomorrow agenda.
 - `POST /calendar/events/1/cancel` - cancel an event.
 - `DELETE /calendar/events/1` - delete an event.
+- `POST /contacts?name=Bajrangi&email=bajrangi@example.com&phone=919999999999` - create a contact.
+- `GET /contacts` - list contacts.
+- `GET /contacts?q=Bajrangi` - search contacts.
+- `GET /contacts/1` - get one contact.
+- `PATCH /contacts/1?email=new@example.com` - update a contact.
+- `DELETE /contacts/1` - delete a contact.
 - `POST /pomodoro/start?minutes=25` - start Pomodoro.
 - `GET /pomodoro` - Pomodoro status.
 - `POST /browser/open?target=openai.com` - open website/search target.
@@ -284,6 +298,7 @@ python wake_word.py
 - PDF reading needs `pypdf` or `PyPDF2`; OCR will need an OCR engine in a later batch.
 - OCR uses `pytesseract`, but Windows also needs the Tesseract OCR engine installed and available on PATH.
 - Email defaults to Gmail IMAP/SMTP. For Gmail, enable IMAP and use an app password in `.env`; never paste email passwords into chat.
+- Email send can use a saved contact name if the contact has an email address.
 - WhatsApp send/search requires WhatsApp Web login and may need selector updates if WhatsApp changes its UI.
 - Security modes: `relaxed` confirms only highest-risk actions, `normal` confirms messaging/download/automation/power/git write actions, and `strict` confirms every recognized risky action.
 - Keep `.env` private.

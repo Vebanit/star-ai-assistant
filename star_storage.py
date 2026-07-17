@@ -96,6 +96,17 @@ def init_db():
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT,
+                phone TEXT,
+                company TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS automations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -133,6 +144,7 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
             CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(due_at, status);
             CREATE INDEX IF NOT EXISTS idx_calendar_events_start ON calendar_events(starts_at, status);
+            CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
             CREATE INDEX IF NOT EXISTS idx_automations_due ON automations(next_run_at, status);
             CREATE INDEX IF NOT EXISTS idx_automation_runs_id ON automation_runs(automation_id);
             """
@@ -309,6 +321,7 @@ def get_stats():
         open_task_count = conn.execute("SELECT COUNT(*) AS count FROM tasks WHERE status = 'open'").fetchone()["count"]
         open_reminder_count = conn.execute("SELECT COUNT(*) AS count FROM reminders WHERE status = 'open'").fetchone()["count"]
         upcoming_event_count = conn.execute("SELECT COUNT(*) AS count FROM calendar_events WHERE status = 'scheduled'").fetchone()["count"]
+        contact_count = conn.execute("SELECT COUNT(*) AS count FROM contacts").fetchone()["count"]
         active_automation_count = conn.execute("SELECT COUNT(*) AS count FROM automations WHERE status = 'active'").fetchone()["count"]
 
     return {
@@ -320,6 +333,7 @@ def get_stats():
         "open_tasks": open_task_count,
         "open_reminders": open_reminder_count,
         "upcoming_calendar_events": upcoming_event_count,
+        "contacts": contact_count,
         "active_automations": active_automation_count,
     }
 

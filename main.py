@@ -40,6 +40,7 @@ import star_analytics
 import star_vision
 import star_email
 import star_calendar
+import star_contacts
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -988,8 +989,11 @@ def handle_email_command(command):
     parsed = parse_email_send(text)
     if parsed:
         to_value, subject, body = parsed
+        resolved = star_contacts.resolve_email(to_value)
+        if not resolved:
+            return f"I could not find an email address for {to_value}."
         try:
-            result = star_email.send_email(to_value, subject, body)
+            result = star_email.send_email(resolved, subject, body)
             return f"Email sent to {result['to']}."
         except RuntimeError as exc:
             return str(exc)
@@ -1024,6 +1028,68 @@ def handle_email_command(command):
             return "Email delete failed."
 
     return "Email commands: email status, read emails, unread emails, search emails invoice, send email to someone@example.com subject Hello message Hi."
+
+
+# ------------------- CONTACTS AGENT -------------------
+
+def handle_contacts_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text in {"contacts", "show contacts", "list contacts", "address book"}:
+        return star_contacts.format_contacts(star_contacts.list_contacts(limit=10))
+
+    if lower_text.startswith(("add contact", "save contact", "new contact")):
+        payload = text_after_any(text, ["add contact", "save contact", "new contact"]).strip()
+        if not payload:
+            return "Tell me the contact name, email, or phone."
+        parsed = star_contacts.parse_contact_payload(payload)
+        if not parsed["name"]:
+            return "Tell me the contact name."
+        contact_id = star_contacts.add_contact(parsed["name"], email=parsed["email"], phone=parsed["phone"])
+        return f"Contact {contact_id} saved."
+
+    if lower_text.startswith(("find contact", "search contact", "contact ")):
+        query = text_after_any(text, ["find contact", "search contact", "contact"]).strip()
+        if not query:
+            return "Tell me which contact to find."
+        return star_contacts.format_contacts(star_contacts.search_contacts(query, limit=6))
+
+    if lower_text.startswith("set contact email"):
+        payload = text_after_any(text, ["set contact email"]).strip()
+        if " to " not in payload.lower():
+            return "Use: set contact email Bajrangi to name@example.com."
+        index = payload.lower().index(" to ")
+        query = payload[:index].strip()
+        email = payload[index + 4:].strip()
+        contact = star_contacts.find_one(query)
+        if not contact:
+            return "Contact not found."
+        return "Contact updated." if star_contacts.update_contact(contact["id"], email=email) else "Contact update failed."
+
+    if lower_text.startswith("set contact phone"):
+        payload = text_after_any(text, ["set contact phone"]).strip()
+        if " to " not in payload.lower():
+            return "Use: set contact phone Bajrangi to +919999999999."
+        index = payload.lower().index(" to ")
+        query = payload[:index].strip()
+        phone = payload[index + 4:].strip()
+        contact = star_contacts.find_one(query)
+        if not contact:
+            return "Contact not found."
+        return "Contact updated." if star_contacts.update_contact(contact["id"], phone=phone) else "Contact update failed."
+
+    if lower_text.startswith(("delete contact", "remove contact")):
+        contact_id = first_number(text)
+        if not contact_id:
+            query = text_after_any(text, ["delete contact", "remove contact"]).strip()
+            contact = star_contacts.find_one(query) if query else None
+            contact_id = contact["id"] if contact else None
+        if not contact_id:
+            return "Tell me the contact number or name to delete."
+        return "Contact deleted." if star_contacts.delete_contact(contact_id) else "Contact not found."
+
+    return None
 
 
 # ------------------- CODING + GIT AGENTS -------------------
@@ -1387,6 +1453,7 @@ TOOLS = {
     "vision",
     "email",
     "calendar",
+    "contacts",
     "none",
 }
 
@@ -1639,6 +1706,25 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in calendar_phrases):
         return "calendar"
 
+    contacts_phrases = [
+        "contacts",
+        "show contacts",
+        "list contacts",
+        "address book",
+        "add contact",
+        "save contact",
+        "new contact",
+        "find contact",
+        "search contact",
+        "contact ",
+        "set contact email",
+        "set contact phone",
+        "delete contact",
+        "remove contact",
+    ]
+    if any(text.startswith(phrase) or text == phrase.strip() for phrase in contacts_phrases):
+        return "contacts"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -1697,6 +1783,7 @@ analytics
 vision
 email
 calendar
+contacts
 none
 
 Reply ONLY with one tool name.
@@ -1778,6 +1865,9 @@ def run_tool(tool, command):
 
     if tool == "calendar":
         return handle_calendar_command(command)
+
+    if tool == "contacts":
+        return handle_contacts_command(command)
 
     return None
 
@@ -2306,6 +2396,36 @@ def calendar_cancel(event_id: int):
 @app.delete("/calendar/events/{event_id}")
 def calendar_delete(event_id: int):
     return {"status": "deleted" if star_calendar.delete_event(event_id) else "not_found", "id": event_id}
+
+
+@app.post("/contacts")
+def contacts_create(name: str, email: Optional[str] = None, phone: Optional[str] = None, company: Optional[str] = None, notes: Optional[str] = None):
+    contact_id = star_contacts.add_contact(name, email=email, phone=phone, company=company, notes=notes)
+    return {"status": "saved" if contact_id else "ignored", "id": contact_id}
+
+
+@app.get("/contacts")
+def contacts_list(q: Optional[str] = None, limit: int = 50):
+    if q:
+        return {"items": star_contacts.search_contacts(q, limit=limit)}
+    return {"items": star_contacts.list_contacts(limit=limit)}
+
+
+@app.get("/contacts/{contact_id}")
+def contacts_get(contact_id: int):
+    contact = star_contacts.get_contact(contact_id)
+    return contact or {"status": "not_found", "id": contact_id}
+
+
+@app.patch("/contacts/{contact_id}")
+def contacts_update(contact_id: int, name: Optional[str] = None, email: Optional[str] = None, phone: Optional[str] = None, company: Optional[str] = None, notes: Optional[str] = None):
+    updated = star_contacts.update_contact(contact_id, name=name, email=email, phone=phone, company=company, notes=notes)
+    return {"status": "updated" if updated else "not_found", "id": contact_id}
+
+
+@app.delete("/contacts/{contact_id}")
+def contacts_delete(contact_id: int):
+    return {"status": "deleted" if star_contacts.delete_contact(contact_id) else "not_found", "id": contact_id}
 
 
 @app.get("/files/search")
