@@ -41,6 +41,7 @@ import star_vision
 import star_email
 import star_calendar
 import star_contacts
+import star_clipboard
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1092,6 +1093,106 @@ def handle_contacts_command(command):
     return None
 
 
+# ------------------- CLIPBOARD + SNIPPETS AGENT -------------------
+
+def parse_snippet_payload(payload):
+    lower_payload = payload.lower()
+    for marker in [" as ", " text ", " content "]:
+        if marker in lower_payload:
+            index = lower_payload.index(marker)
+            name = payload[:index].strip()
+            content = payload[index + len(marker):].strip()
+            return name, content
+    return None, None
+
+
+def handle_clipboard_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text in {"clipboard", "read clipboard", "clipboard status", "show clipboard"}:
+        try:
+            return star_clipboard.format_clipboard_text(star_clipboard.get_text())
+        except Exception as exc:
+            storage.add_log("warning", "clipboard_read_failed", str(exc))
+            return "Could not read clipboard."
+
+    if lower_text.startswith(("copy text", "copy to clipboard")):
+        content = text_after_any(text, ["copy text", "copy to clipboard"]).strip()
+        if not content:
+            return "Tell me what text to copy."
+        try:
+            result = star_clipboard.set_text(content)
+            return f"Copied {result['chars']} characters to clipboard."
+        except Exception as exc:
+            storage.add_log("warning", "clipboard_copy_failed", str(exc))
+            return "Clipboard copy failed."
+
+    if lower_text.startswith("paste text"):
+        content = text_after_any(text, ["paste text"]).strip()
+        if not content:
+            return "Tell me what text to paste."
+        try:
+            result = star_clipboard.paste_text(content)
+            return f"Pasted {result['chars']} characters."
+        except Exception as exc:
+            storage.add_log("warning", "clipboard_paste_failed", str(exc))
+            return "Clipboard paste failed."
+
+    if lower_text.startswith(("save snippet", "add snippet", "new snippet")):
+        payload = text_after_any(text, ["save snippet", "add snippet", "new snippet"]).strip()
+        name, content = parse_snippet_payload(payload)
+        if not name or not content:
+            return "Use: save snippet greeting as hello there."
+        snippet_id = star_clipboard.add_snippet(name, content)
+        return f"Snippet {snippet_id} saved."
+
+    if lower_text in {"show snippets", "list snippets", "snippets"}:
+        return star_clipboard.format_snippets(star_clipboard.list_snippets(limit=10))
+
+    if lower_text.startswith("search snippets"):
+        query = text_after_any(text, ["search snippets"]).strip()
+        if not query:
+            return "Tell me what snippet to search."
+        return star_clipboard.format_snippets(star_clipboard.search_snippets(query, limit=8))
+
+    if lower_text.startswith("copy snippet"):
+        snippet_id = first_number(text)
+        if not snippet_id:
+            return "Tell me the snippet number to copy."
+        snippet = star_clipboard.get_snippet(snippet_id)
+        if not snippet:
+            return "Snippet not found."
+        try:
+            star_clipboard.set_text(snippet["content"])
+            return f"Snippet {snippet_id} copied to clipboard."
+        except Exception as exc:
+            storage.add_log("warning", "snippet_copy_failed", str(exc))
+            return "Snippet copy failed."
+
+    if lower_text.startswith("paste snippet"):
+        snippet_id = first_number(text)
+        if not snippet_id:
+            return "Tell me the snippet number to paste."
+        snippet = star_clipboard.get_snippet(snippet_id)
+        if not snippet:
+            return "Snippet not found."
+        try:
+            star_clipboard.paste_text(snippet["content"])
+            return f"Snippet {snippet_id} pasted."
+        except Exception as exc:
+            storage.add_log("warning", "snippet_paste_failed", str(exc))
+            return "Snippet paste failed."
+
+    if lower_text.startswith("delete snippet"):
+        snippet_id = first_number(text)
+        if not snippet_id:
+            return "Tell me the snippet number to delete."
+        return "Snippet deleted." if star_clipboard.delete_snippet(snippet_id) else "Snippet not found."
+
+    return None
+
+
 # ------------------- CODING + GIT AGENTS -------------------
 
 def handle_coding_command(command):
@@ -1454,6 +1555,7 @@ TOOLS = {
     "email",
     "calendar",
     "contacts",
+    "clipboard",
     "none",
 }
 
@@ -1725,6 +1827,28 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase.strip() for phrase in contacts_phrases):
         return "contacts"
 
+    clipboard_phrases = [
+        "clipboard",
+        "read clipboard",
+        "clipboard status",
+        "show clipboard",
+        "copy text",
+        "copy to clipboard",
+        "paste text",
+        "save snippet",
+        "add snippet",
+        "new snippet",
+        "show snippets",
+        "list snippets",
+        "snippets",
+        "search snippets",
+        "copy snippet",
+        "paste snippet",
+        "delete snippet",
+    ]
+    if any(text.startswith(phrase) or text == phrase for phrase in clipboard_phrases):
+        return "clipboard"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -1784,6 +1908,7 @@ vision
 email
 calendar
 contacts
+clipboard
 none
 
 Reply ONLY with one tool name.
@@ -1868,6 +1993,9 @@ def run_tool(tool, command):
 
     if tool == "contacts":
         return handle_contacts_command(command)
+
+    if tool == "clipboard":
+        return handle_clipboard_command(command)
 
     return None
 
@@ -2062,7 +2190,7 @@ def ask_star(user_text):
 
     tool = agent_brain(text)
     if tool != "none":
-        if tool in {"whatsapp", "browser", "automation", "email"}:
+        if tool in {"whatsapp", "browser", "automation", "email", "clipboard"}:
             tool_reply = security_gate(text, tool, lambda: run_tool(tool, text))
         else:
             tool_reply = run_tool(tool, text)
@@ -2426,6 +2554,79 @@ def contacts_update(contact_id: int, name: Optional[str] = None, email: Optional
 @app.delete("/contacts/{contact_id}")
 def contacts_delete(contact_id: int):
     return {"status": "deleted" if star_contacts.delete_contact(contact_id) else "not_found", "id": contact_id}
+
+
+@app.get("/clipboard")
+def clipboard_get():
+    try:
+        text_value = star_clipboard.get_text()
+        return {"text": text_value, "chars": len(text_value)}
+    except Exception as exc:
+        return {"error": str(exc), "text": "", "chars": 0}
+
+
+@app.post("/clipboard")
+def clipboard_set(text: str):
+    try:
+        return star_clipboard.set_text(text)
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@app.post("/clipboard/paste")
+def clipboard_paste(text: str):
+    try:
+        return star_clipboard.paste_text(text)
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@app.post("/snippets")
+def snippets_create(name: str, content: str, tags: Optional[str] = None):
+    snippet_id = star_clipboard.add_snippet(name, content, tags=tags)
+    return {"status": "saved" if snippet_id else "ignored", "id": snippet_id}
+
+
+@app.get("/snippets")
+def snippets_list(q: Optional[str] = None, limit: int = 50):
+    if q:
+        return {"items": star_clipboard.search_snippets(q, limit=limit)}
+    return {"items": star_clipboard.list_snippets(limit=limit)}
+
+
+@app.get("/snippets/{snippet_id}")
+def snippets_get(snippet_id: int):
+    snippet = star_clipboard.get_snippet(snippet_id)
+    return snippet or {"status": "not_found", "id": snippet_id}
+
+
+@app.patch("/snippets/{snippet_id}")
+def snippets_update(snippet_id: int, name: Optional[str] = None, content: Optional[str] = None, tags: Optional[str] = None):
+    updated = star_clipboard.update_snippet(snippet_id, name=name, content=content, tags=tags)
+    return {"status": "updated" if updated else "not_found", "id": snippet_id}
+
+
+@app.post("/snippets/{snippet_id}/copy")
+def snippets_copy(snippet_id: int):
+    snippet = star_clipboard.get_snippet(snippet_id)
+    if not snippet:
+        return {"status": "not_found", "id": snippet_id}
+    result = star_clipboard.set_text(snippet["content"])
+    return {"status": result["status"], "id": snippet_id, "chars": result["chars"]}
+
+
+@app.post("/snippets/{snippet_id}/paste")
+def snippets_paste(snippet_id: int):
+    snippet = star_clipboard.get_snippet(snippet_id)
+    if not snippet:
+        return {"status": "not_found", "id": snippet_id}
+    result = star_clipboard.paste_text(snippet["content"])
+    return {"status": result["status"], "id": snippet_id, "chars": result["chars"]}
+
+
+@app.delete("/snippets/{snippet_id}")
+def snippets_delete(snippet_id: int):
+    return {"status": "deleted" if star_clipboard.delete_snippet(snippet_id) else "not_found", "id": snippet_id}
 
 
 @app.get("/files/search")

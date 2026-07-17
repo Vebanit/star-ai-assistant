@@ -24,6 +24,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Notes, tasks/to-do list, reminders, daily briefing, and Pomodoro timer.
 - Calendar events, today/tomorrow agenda, upcoming events, cancel, and delete.
 - Contacts/address book for saved names, email addresses, phone numbers, lookup, update, and delete.
+- Clipboard and snippets helper for copy/read/paste plus reusable text templates.
 - Browser tab controls, Google/DuckDuckGo search, and file download helper.
 - Media controls for play/pause, next/previous, YouTube, Spotify, Netflix, and VLC.
 - WhatsApp chat search/send helpers through WhatsApp Web.
@@ -128,6 +129,15 @@ python wake_word.py
 - `set contact email Bajrangi to bajrangi@example.com`
 - `set contact phone Bajrangi to +919999999999`
 - `delete contact 1`
+- `read clipboard`
+- `copy text hello from STAR`
+- `paste text hello from STAR` then `confirm` or `cancel`
+- `save snippet greeting as hello, how are you?`
+- `show snippets`
+- `search snippets greeting`
+- `copy snippet 1`
+- `paste snippet 1` then `confirm` or `cancel`
+- `delete snippet 1`
 - `start pomodoro 25`
 - `pomodoro status`
 - `open website openai.com`
@@ -233,6 +243,16 @@ python wake_word.py
 - `GET /contacts/1` - get one contact.
 - `PATCH /contacts/1?email=new@example.com` - update a contact.
 - `DELETE /contacts/1` - delete a contact.
+- `GET /clipboard` - read clipboard text.
+- `POST /clipboard?text=hello` - copy text to clipboard.
+- `POST /clipboard/paste?text=hello` - paste text into the active app.
+- `POST /snippets?name=greeting&content=hello` - save a snippet.
+- `GET /snippets` - list snippets.
+- `GET /snippets?q=greeting` - search snippets.
+- `PATCH /snippets/1?content=updated` - update a snippet.
+- `POST /snippets/1/copy` - copy snippet content to clipboard.
+- `POST /snippets/1/paste` - paste snippet content into the active app.
+- `DELETE /snippets/1` - delete a snippet.
 - `POST /pomodoro/start?minutes=25` - start Pomodoro.
 - `GET /pomodoro` - Pomodoro status.
 - `POST /browser/open?target=openai.com` - open website/search target.
@@ -299,6 +319,7 @@ python wake_word.py
 - OCR uses `pytesseract`, but Windows also needs the Tesseract OCR engine installed and available on PATH.
 - Email defaults to Gmail IMAP/SMTP. For Gmail, enable IMAP and use an app password in `.env`; never paste email passwords into chat.
 - Email send can use a saved contact name if the contact has an email address.
+- Clipboard paste actions type into the currently active app, so STAR asks for confirmation in normal/strict security modes.
 - WhatsApp send/search requires WhatsApp Web login and may need selector updates if WhatsApp changes its UI.
 - Security modes: `relaxed` confirms only highest-risk actions, `normal` confirms messaging/download/automation/power/git write actions, and `strict` confirms every recognized risky action.
 - Keep `.env` private.

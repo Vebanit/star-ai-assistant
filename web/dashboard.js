@@ -45,6 +45,7 @@ function renderMetrics(health) {
   const items = [
     ["Memory", health.memory_items],
     ["Contacts", health.contacts],
+    ["Snippets", health.snippets],
     ["Tasks", health.open_tasks],
     ["Reminders", health.open_reminders],
     ["Calendar", health.upcoming_calendar_events],
