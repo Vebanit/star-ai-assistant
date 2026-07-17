@@ -84,6 +84,29 @@ def init_db():
                 completed_at TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS automations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                kind TEXT NOT NULL DEFAULT 'command',
+                command TEXT,
+                steps_json TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                next_run_at TEXT,
+                interval_minutes INTEGER,
+                created_at TEXT NOT NULL,
+                last_run_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS automation_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                automation_id INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                output TEXT,
+                started_at TEXT NOT NULL,
+                finished_at TEXT NOT NULL,
+                FOREIGN KEY (automation_id) REFERENCES automations(id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_memory_category ON memory(category);
             CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations(created_at);
             CREATE INDEX IF NOT EXISTS idx_commands_created ON commands(created_at);
@@ -91,6 +114,8 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at);
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
             CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(due_at, status);
+            CREATE INDEX IF NOT EXISTS idx_automations_due ON automations(next_run_at, status);
+            CREATE INDEX IF NOT EXISTS idx_automation_runs_id ON automation_runs(automation_id);
             """
         )
 
@@ -264,6 +289,7 @@ def get_stats():
         note_count = conn.execute("SELECT COUNT(*) AS count FROM notes").fetchone()["count"]
         open_task_count = conn.execute("SELECT COUNT(*) AS count FROM tasks WHERE status = 'open'").fetchone()["count"]
         open_reminder_count = conn.execute("SELECT COUNT(*) AS count FROM reminders WHERE status = 'open'").fetchone()["count"]
+        active_automation_count = conn.execute("SELECT COUNT(*) AS count FROM automations WHERE status = 'active'").fetchone()["count"]
 
     return {
         "memory_items": memory_count,
@@ -273,6 +299,7 @@ def get_stats():
         "notes": note_count,
         "open_tasks": open_task_count,
         "open_reminders": open_reminder_count,
+        "active_automations": active_automation_count,
     }
 
 

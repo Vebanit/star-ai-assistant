@@ -34,6 +34,7 @@ import star_media
 import star_whatsapp
 import star_coding
 import star_git
+import star_automation
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -975,6 +976,96 @@ def handle_git_command(command):
     return None
 
 
+# ------------------- AUTOMATION AGENT -------------------
+
+def run_automation_item(automation):
+    run_id = star_automation.mark_run_started(automation["id"])
+    outputs = []
+    status = "ok"
+
+    for step in star_automation.automation_steps(automation):
+        if not step:
+            continue
+        try:
+            outputs.append(f"> {step}\n{ask_star(step)}")
+        except Exception as exc:
+            status = "error"
+            outputs.append(f"> {step}\nERROR: {exc}")
+            break
+
+    output = "\n\n".join(outputs)
+    star_automation.finish_run(run_id, automation, status, output)
+    return {"id": automation["id"], "status": status, "output": output}
+
+
+def run_due_automations(limit=10):
+    due = star_automation.due_automations(limit=limit)
+    results = [run_automation_item(item) for item in due]
+    return results
+
+
+def handle_automation_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text.startswith(("schedule command", "schedule")):
+        payload = text_after_any(text, ["schedule command", "schedule"]).strip()
+        due_at = star_automation.parse_schedule(payload)
+        if not due_at:
+            return "Tell me when to run it, like in 10 minutes or at 5 pm."
+
+        command_text = star_automation.strip_schedule_phrase(payload)
+        interval = star_automation.parse_interval(payload)
+        command_text = command_text.replace("every", "").strip()
+        if not command_text:
+            return "Tell me what command to schedule."
+
+        automation_id = star_automation.create_command_automation(
+            name=command_text[:60],
+            command=command_text,
+            next_run_at=due_at,
+            interval_minutes=interval,
+        )
+        return f"Automation {automation_id} scheduled for {due_at.strftime('%Y-%m-%d %H:%M')}."
+
+    if lower_text.startswith("create workflow"):
+        payload = text_after_any(text, ["create workflow"]).strip()
+        if not payload or " then " not in payload.lower():
+            return "Use: create workflow first command then second command."
+        steps = [part.strip() for part in payload.split(" then ") if part.strip()]
+        automation_id = star_automation.create_workflow("voice workflow", steps)
+        return f"Workflow {automation_id} created with {len(steps)} steps."
+
+    if lower_text in {"show automations", "list automations", "automation list"}:
+        return star_automation.format_automations(star_automation.list_automations(limit=20))
+
+    if lower_text in {"run automations", "run due automations", "check automations"}:
+        results = run_due_automations()
+        if not results:
+            return "No automations are due."
+        return f"Ran {len(results)} automation(s)."
+
+    if lower_text.startswith("delete automation"):
+        automation_id = first_number(text)
+        if not automation_id:
+            return "Tell me the automation number to delete."
+        return "Automation deleted." if star_automation.delete_automation(automation_id) else "Automation not found."
+
+    if lower_text.startswith("pause automation"):
+        automation_id = first_number(text)
+        if not automation_id:
+            return "Tell me the automation number to pause."
+        return "Automation paused." if star_automation.pause_automation(automation_id) else "Automation not found."
+
+    if lower_text.startswith("resume automation"):
+        automation_id = first_number(text)
+        if not automation_id:
+            return "Tell me the automation number to resume."
+        return "Automation resumed." if star_automation.resume_automation(automation_id) else "Automation not found."
+
+    return None
+
+
 # ------------------- ACTION ROUTING -------------------
 
 TOOLS = {
@@ -992,6 +1083,7 @@ TOOLS = {
     "media",
     "coding",
     "git",
+    "automation",
     "none",
 }
 
@@ -1131,6 +1223,23 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in git_phrases):
         return "git"
 
+    automation_phrases = [
+        "schedule command",
+        "schedule ",
+        "create workflow",
+        "show automations",
+        "list automations",
+        "automation list",
+        "run automations",
+        "run due automations",
+        "check automations",
+        "delete automation",
+        "pause automation",
+        "resume automation",
+    ]
+    if any(text.startswith(phrase) or text == phrase.strip() for phrase in automation_phrases):
+        return "automation"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -1183,6 +1292,7 @@ browser
 media
 coding
 git
+automation
 none
 
 Reply ONLY with one tool name.
@@ -1246,6 +1356,9 @@ def run_tool(tool, command):
 
     if tool == "git":
         return handle_git_command(command)
+
+    if tool == "automation":
+        return handle_automation_command(command)
 
     return None
 
@@ -1771,6 +1884,66 @@ def git_branch():
 @app.get("/git/remotes")
 def git_remotes():
     return star_git.remotes()
+
+
+@app.post("/automations")
+def automation_create(command: str, schedule: str, name: Optional[str] = None, interval_minutes: Optional[int] = None):
+    due_at = star_automation.parse_schedule(schedule)
+    if not due_at:
+        return {"status": "invalid_schedule"}
+    automation_id = star_automation.create_command_automation(
+        name=name or command[:60],
+        command=command,
+        next_run_at=due_at,
+        interval_minutes=interval_minutes,
+    )
+    return {"status": "saved" if automation_id else "ignored", "id": automation_id, "next_run_at": due_at.isoformat()}
+
+
+@app.post("/automations/workflow")
+def automation_workflow_create(name: str, steps: str, schedule: Optional[str] = None):
+    step_list = [item.strip() for item in steps.split("|") if item.strip()]
+    due_at = star_automation.parse_schedule(schedule) if schedule else None
+    automation_id = star_automation.create_workflow(name=name, steps=step_list, next_run_at=due_at)
+    return {"status": "saved" if automation_id else "ignored", "id": automation_id}
+
+
+@app.get("/automations")
+def automation_list(status: str = "active", limit: int = 50):
+    return {"items": star_automation.list_automations(status=status, limit=limit)}
+
+
+@app.get("/automations/due")
+def automation_due(limit: int = 20):
+    return {"items": star_automation.due_automations(limit=limit)}
+
+
+@app.post("/automations/run-due")
+def automation_run_due(limit: int = 10):
+    return {"items": run_due_automations(limit=limit)}
+
+
+@app.post("/automations/{automation_id}/pause")
+def automation_pause(automation_id: int):
+    changed = star_automation.pause_automation(automation_id)
+    return {"status": "paused" if changed else "not_found", "id": automation_id}
+
+
+@app.post("/automations/{automation_id}/resume")
+def automation_resume(automation_id: int):
+    changed = star_automation.resume_automation(automation_id)
+    return {"status": "active" if changed else "not_found", "id": automation_id}
+
+
+@app.delete("/automations/{automation_id}")
+def automation_delete(automation_id: int):
+    deleted = star_automation.delete_automation(automation_id)
+    return {"status": "deleted" if deleted else "not_found", "id": automation_id}
+
+
+@app.get("/automations/runs")
+def automation_runs(automation_id: Optional[int] = None, limit: int = 50):
+    return {"items": star_automation.list_runs(automation_id=automation_id, limit=limit)}
 
 
 @app.post("/notes")

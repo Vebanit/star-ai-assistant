@@ -27,6 +27,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - WhatsApp chat search/send helpers through WhatsApp Web.
 - Coding helper for project analysis, code search, explain/review file, and Python compile checks.
 - Git helper for status, log, diff, branch, remotes, and confirmed commit/pull/push.
+- Smart automation for scheduled commands, simple workflows, due runs, and automation history.
 - Google search command support.
 - Basic WhatsApp Web and Instagram DM automation through Selenium.
 
@@ -133,6 +134,14 @@ python wake_word.py
 - `git log 5`
 - `git diff`
 - `git commit update STAR features` then `confirm` or `cancel`
+- `schedule command system status in 10 minutes`
+- `schedule daily briefing at 9 am`
+- `create workflow system status then show tasks`
+- `show automations`
+- `run automations`
+- `pause automation 1`
+- `resume automation 1`
+- `delete automation 1`
 - `check whatsapp`
 
 ## API Helpers
@@ -189,6 +198,15 @@ python wake_word.py
 - `GET /git/diff` - current diff.
 - `GET /git/branch` - current branch.
 - `GET /git/remotes` - remotes.
+- `POST /automations?command=system status&schedule=in 10 minutes` - schedule a command.
+- `POST /automations/workflow?name=morning&steps=system status|show tasks` - create a workflow.
+- `GET /automations` - list automations.
+- `GET /automations/due` - due automations.
+- `POST /automations/run-due` - run due automations.
+- `POST /automations/1/pause` - pause automation.
+- `POST /automations/1/resume` - resume automation.
+- `DELETE /automations/1` - delete automation.
+- `GET /automations/runs` - automation run history.
 - `POST /confirm` - confirm a pending risky action.
 - `POST /cancel` - cancel a pending risky action.
 

@@ -43,7 +43,7 @@ function renderMetrics(health) {
     ["Memory", health.memory_items],
     ["Tasks", health.open_tasks],
     ["Reminders", health.open_reminders],
-    ["Logs", health.logs],
+    ["Automations", health.active_automations],
   ];
 
   $("#metrics").innerHTML = items
