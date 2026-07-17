@@ -37,6 +37,7 @@ import star_git
 import star_automation
 import star_security
 import star_analytics
+import star_vision
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1136,6 +1137,61 @@ def handle_analytics_command(command):
     return None
 
 
+# ------------------- VISION AGENT -------------------
+
+def handle_vision_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text in {"take screenshot", "capture screenshot", "screenshot"}:
+        path = star_vision.capture_screenshot()
+        return f"Screenshot saved to {path}."
+
+    if lower_text in {"analyze screen", "analyse screen", "read screen", "screen summary"}:
+        result = star_vision.screen_summary()
+        ocr_text = result["ocr"].get("text") if result["ocr"].get("available") else ""
+        if ocr_text:
+            return f"{result['analysis']['summary']} Text found: {ocr_text[:300]}"
+        return result["analysis"]["summary"] + " OCR is not available." if not result["ocr"].get("available") else result["analysis"]["summary"]
+
+    if lower_text.startswith(("analyze image", "analyse image")):
+        path = text_after_any(text, ["analyze image", "analyse image"])
+        if not path:
+            return "Tell me which image to analyze."
+        result = star_vision.analyze_image(path)
+        return result["summary"]
+
+    if lower_text.startswith(("ocr image", "read image text", "read text from image")):
+        path = text_after_any(text, ["ocr image", "read image text", "read text from image"])
+        if not path:
+            return "Tell me which image to read."
+        result = star_vision.ocr_image(path)
+        if not result.get("available"):
+            return result.get("error") or "OCR is not available."
+        return result.get("text") or "No text found in image."
+
+    if lower_text.startswith(("scan qr", "read qr", "scan barcode")):
+        path = text_after_any(text, ["scan qr", "read qr", "scan barcode"])
+        if not path:
+            return "Tell me which image to scan."
+        qr = star_vision.decode_qr(path)
+        barcodes = star_vision.decode_barcodes(path)
+        items = qr.get("items", []) + barcodes.get("items", [])
+        if not items:
+            return qr.get("error") or barcodes.get("error") or "No QR or barcode found."
+        return "Found codes: " + ", ".join(item["data"] for item in items[:5])
+
+    if lower_text.startswith("compare images"):
+        payload = text_after_any(text, ["compare images"])
+        parts = [part.strip() for part in payload.split(" and ") if part.strip()]
+        if len(parts) != 2:
+            return "Use: compare images first.png and second.png."
+        result = star_vision.compare_images(parts[0], parts[1])
+        return f"Images are {result['similarity_percent']} percent similar."
+
+    return None
+
+
 def security_gate(command, tool, callback):
     result = star_security.classify_command(command, tool=tool)
     if not result["requires_confirmation"]:
@@ -1170,6 +1226,7 @@ TOOLS = {
     "automation",
     "security",
     "analytics",
+    "vision",
     "none",
 }
 
@@ -1353,6 +1410,26 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in analytics_phrases):
         return "analytics"
 
+    vision_phrases = [
+        "take screenshot",
+        "capture screenshot",
+        "analyze screen",
+        "analyse screen",
+        "read screen",
+        "screen summary",
+        "analyze image",
+        "analyse image",
+        "ocr image",
+        "read image text",
+        "read text from image",
+        "scan qr",
+        "read qr",
+        "scan barcode",
+        "compare images",
+    ]
+    if any(text.startswith(phrase) or text == phrase for phrase in vision_phrases):
+        return "vision"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -1408,6 +1485,7 @@ git
 automation
 security
 analytics
+vision
 none
 
 Reply ONLY with one tool name.
@@ -1480,6 +1558,9 @@ def run_tool(tool, command):
 
     if tool == "analytics":
         return handle_analytics_command(command)
+
+    if tool == "vision":
+        return handle_vision_command(command)
 
     return None
 
@@ -1874,6 +1955,41 @@ def analytics_tools():
 @app.get("/analytics/errors")
 def analytics_errors(limit: int = 10):
     return star_analytics.recent_errors(limit=limit)
+
+
+@app.post("/vision/screenshot")
+def vision_screenshot():
+    return {"path": star_vision.capture_screenshot()}
+
+
+@app.get("/vision/analyze")
+def vision_analyze(path: str):
+    return star_vision.analyze_image(path)
+
+
+@app.get("/vision/ocr")
+def vision_ocr(path: str):
+    return star_vision.ocr_image(path)
+
+
+@app.get("/vision/qr")
+def vision_qr(path: str):
+    return star_vision.decode_qr(path)
+
+
+@app.get("/vision/barcode")
+def vision_barcode(path: str):
+    return star_vision.decode_barcodes(path)
+
+
+@app.get("/vision/screen")
+def vision_screen():
+    return star_vision.screen_summary()
+
+
+@app.get("/vision/compare")
+def vision_compare(first: str, second: str):
+    return star_vision.compare_images(first, second)
 
 
 @app.get("/files/search")

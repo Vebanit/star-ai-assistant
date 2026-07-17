@@ -30,6 +30,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Smart automation for scheduled commands, simple workflows, due runs, and automation history.
 - Security mode, permission checks, confirmation gates, secret health, and audit logs.
 - Analytics for command success rate, top tools, daily activity, productivity, memory, and recent issues.
+- Vision helper for screenshots, image analysis, OCR, QR/barcode scan, and image comparison.
 - Google search command support.
 - Basic WhatsApp Web and Instagram DM automation through Selenium.
 
@@ -154,6 +155,13 @@ python wake_word.py
 - `top tools`
 - `daily activity`
 - `recent errors`
+- `take screenshot`
+- `analyze screen`
+- `read screen`
+- `analyze image screenshot_153709.png`
+- `ocr image screenshot_153709.png`
+- `scan qr qr.png`
+- `compare images first.png and second.png`
 - `check whatsapp`
 
 ## API Helpers
@@ -228,6 +236,13 @@ python wake_word.py
 - `GET /analytics/daily` - daily command counts.
 - `GET /analytics/tools` - tool usage breakdown.
 - `GET /analytics/errors` - recent errors and warnings.
+- `POST /vision/screenshot` - capture a screenshot.
+- `GET /vision/analyze?path=image.png` - image metadata, brightness, and colors.
+- `GET /vision/ocr?path=image.png` - OCR image text if Tesseract is installed.
+- `GET /vision/qr?path=image.png` - scan QR code.
+- `GET /vision/barcode?path=image.png` - scan barcode if decoder is available.
+- `GET /vision/screen` - screenshot plus image analysis and OCR attempt.
+- `GET /vision/compare?first=a.png&second=b.png` - compare two images.
 - `POST /confirm` - confirm a pending risky action.
 - `POST /cancel` - cancel a pending risky action.
 
@@ -237,6 +252,7 @@ python wake_word.py
 - Memory, history, commands, and logs are saved locally in `star.db`; this file is ignored by git because it can contain personal data.
 - If `star_memory.json` exists from an older version, STAR imports it into SQLite on startup.
 - PDF reading needs `pypdf` or `PyPDF2`; OCR will need an OCR engine in a later batch.
+- OCR uses `pytesseract`, but Windows also needs the Tesseract OCR engine installed and available on PATH.
 - WhatsApp send/search requires WhatsApp Web login and may need selector updates if WhatsApp changes its UI.
 - Security modes: `relaxed` confirms only highest-risk actions, `normal` confirms messaging/download/automation/power/git write actions, and `strict` confirms every recognized risky action.
 - Keep `.env` private.
