@@ -43,6 +43,7 @@ import star_calendar
 import star_contacts
 import star_clipboard
 import star_finance
+import star_health
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1243,6 +1244,62 @@ def handle_finance_command(command):
     return None
 
 
+# ------------------- HEALTH AGENT -------------------
+
+def handle_health_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text in {"health summary", "today health", "wellness summary", "daily health"}:
+        return star_health.format_summary(star_health.summary())
+
+    if lower_text in {"show health logs", "health logs", "recent health logs"}:
+        return star_health.format_logs(star_health.list_logs(limit=10))
+
+    if lower_text.startswith(("log water", "drank water", "water ")):
+        payload = text_after_any(text, ["log water", "drank water", "water"]).strip()
+        result = star_health.log_water(payload)
+        if result.get("error"):
+            return result["error"]
+        return f"Water log {result['id']} saved: {result['value']:g} ml."
+
+    if lower_text.startswith(("log sleep", "slept ")):
+        payload = text_after_any(text, ["log sleep", "slept"]).strip()
+        result = star_health.log_sleep(payload)
+        if result.get("error"):
+            return result["error"]
+        return f"Sleep log {result['id']} saved: {result['value']:g} hours."
+
+    if lower_text.startswith(("log workout", "log exercise", "workout ", "exercise ")):
+        payload = text_after_any(text, ["log workout", "log exercise", "workout", "exercise"]).strip()
+        result = star_health.log_workout(payload)
+        if result.get("error"):
+            return result["error"]
+        return f"Workout log {result['id']} saved: {result['value']:g} minutes."
+
+    if lower_text.startswith(("log weight", "weight ")):
+        payload = text_after_any(text, ["log weight", "weight"]).strip()
+        result = star_health.log_weight(payload)
+        if result.get("error"):
+            return result["error"]
+        return f"Weight log {result['id']} saved: {result['value']:g} kg."
+
+    if lower_text.startswith(("log mood", "mood ", "feeling ", "feel ")):
+        payload = text_after_any(text, ["log mood", "mood", "feeling", "feel"]).strip()
+        if not payload:
+            return "Tell me your mood, like log mood happy or mood 8."
+        result = star_health.log_mood(payload)
+        return f"Mood log {result['id']} saved."
+
+    if lower_text.startswith(("delete health log", "delete health")):
+        log_id = first_number(text)
+        if not log_id:
+            return "Tell me the health log number to delete."
+        return "Health log deleted." if star_health.delete_log(log_id) else "Health log not found."
+
+    return None
+
+
 # ------------------- CODING + GIT AGENTS -------------------
 
 def handle_coding_command(command):
@@ -1607,6 +1664,7 @@ TOOLS = {
     "contacts",
     "clipboard",
     "finance",
+    "health",
     "none",
 }
 
@@ -1932,6 +1990,35 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in finance_phrases):
         return "finance"
 
+    health_phrases = [
+        "health summary",
+        "today health",
+        "wellness summary",
+        "daily health",
+        "show health logs",
+        "health logs",
+        "recent health logs",
+        "log water",
+        "drank water",
+        "water ",
+        "log sleep",
+        "slept ",
+        "log workout",
+        "log exercise",
+        "workout ",
+        "exercise ",
+        "log weight",
+        "weight ",
+        "log mood",
+        "mood ",
+        "feeling ",
+        "feel ",
+        "delete health log",
+        "delete health",
+    ]
+    if any(text.startswith(phrase) or text == phrase for phrase in health_phrases):
+        return "health"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -1993,6 +2080,7 @@ calendar
 contacts
 clipboard
 finance
+health
 none
 
 Reply ONLY with one tool name.
@@ -2083,6 +2171,9 @@ def run_tool(tool, command):
 
     if tool == "finance":
         return handle_finance_command(command)
+
+    if tool == "health":
+        return handle_health_command(command)
 
     return None
 
@@ -2749,6 +2840,48 @@ def finance_categories(limit: int = 10):
 @app.delete("/finance/transactions/{transaction_id}")
 def finance_delete(transaction_id: int):
     return {"status": "deleted" if star_finance.delete_transaction(transaction_id) else "not_found", "id": transaction_id}
+
+
+@app.post("/health/logs")
+def health_logs_create(metric: str, value: Optional[float] = None, unit: Optional[str] = None, note: Optional[str] = None):
+    log_id = star_health.add_log(metric, value=value, unit=unit, note=note)
+    return {"status": "saved" if log_id else "ignored", "id": log_id}
+
+
+@app.post("/health/logs/from-text")
+def health_logs_from_text(kind: str, text: str):
+    clean_kind = kind.lower().strip()
+    if clean_kind == "water":
+        result = star_health.log_water(text)
+    elif clean_kind == "sleep":
+        result = star_health.log_sleep(text)
+    elif clean_kind in {"workout", "exercise"}:
+        result = star_health.log_workout(text)
+    elif clean_kind == "weight":
+        result = star_health.log_weight(text)
+    elif clean_kind == "mood":
+        result = star_health.log_mood(text)
+    else:
+        return {"status": "invalid_metric"}
+    if result.get("error"):
+        return {"status": "invalid_log", "error": result["error"]}
+    return {"status": "saved", **result}
+
+
+@app.get("/health/logs")
+def health_logs_list(limit: int = 50, metric: Optional[str] = None):
+    return {"items": star_health.list_logs(limit=limit, metric=metric)}
+
+
+@app.get("/health/summary")
+def health_summary(day: str = "today"):
+    clean_day = "yesterday" if day.lower() == "yesterday" else "today"
+    return star_health.summary(clean_day)
+
+
+@app.delete("/health/logs/{log_id}")
+def health_logs_delete(log_id: int):
+    return {"status": "deleted" if star_health.delete_log(log_id) else "not_found", "id": log_id}
 
 
 @app.get("/files/search")

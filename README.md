@@ -26,6 +26,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Contacts/address book for saved names, email addresses, phone numbers, lookup, update, and delete.
 - Clipboard and snippets helper for copy/read/paste plus reusable text templates.
 - Finance tracker for income, expenses, category breakdowns, monthly balance, and transaction history.
+- Health and habit tracker for water, mood, sleep, workout, weight, and daily wellness summaries.
 - Browser tab controls, Google/DuckDuckGo search, and file download helper.
 - Media controls for play/pause, next/previous, YouTube, Spotify, Netflix, and VLC.
 - WhatsApp chat search/send helpers through WhatsApp Web.
@@ -146,6 +147,14 @@ python wake_word.py
 - `expense categories`
 - `show transactions`
 - `delete transaction 1`
+- `log water 500 ml`
+- `log sleep 7 hours`
+- `log workout 30 minutes running`
+- `log weight 72 kg`
+- `log mood happy`
+- `health summary`
+- `show health logs`
+- `delete health log 1`
 - `start pomodoro 25`
 - `pomodoro status`
 - `open website openai.com`
@@ -267,6 +276,11 @@ python wake_word.py
 - `GET /finance/summary` - current month income, expense, and balance.
 - `GET /finance/categories` - current month expense categories.
 - `DELETE /finance/transactions/1` - delete a transaction.
+- `POST /health/logs?metric=water_ml&value=500&unit=ml` - save a health log.
+- `POST /health/logs/from-text?kind=water&text=500 ml` - save a health log from text.
+- `GET /health/logs` - list health logs.
+- `GET /health/summary` - today health summary.
+- `DELETE /health/logs/1` - delete a health log.
 - `POST /pomodoro/start?minutes=25` - start Pomodoro.
 - `GET /pomodoro` - Pomodoro status.
 - `POST /browser/open?target=openai.com` - open website/search target.
@@ -334,6 +348,7 @@ python wake_word.py
 - Email defaults to Gmail IMAP/SMTP. For Gmail, enable IMAP and use an app password in `.env`; never paste email passwords into chat.
 - Email send can use a saved contact name if the contact has an email address.
 - Clipboard paste actions type into the currently active app, so STAR asks for confirmation in normal/strict security modes.
+- Health logs are personal tracking only, not medical advice.
 - WhatsApp send/search requires WhatsApp Web login and may need selector updates if WhatsApp changes its UI.
 - Security modes: `relaxed` confirms only highest-risk actions, `normal` confirms messaging/download/automation/power/git write actions, and `strict` confirms every recognized risky action.
 - Keep `.env` private.

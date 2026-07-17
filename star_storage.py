@@ -127,6 +127,16 @@ def init_db():
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS health_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                metric TEXT NOT NULL,
+                value REAL,
+                unit TEXT,
+                note TEXT,
+                logged_at TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS automations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -167,6 +177,7 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
             CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name);
             CREATE INDEX IF NOT EXISTS idx_finance_happened ON finance_transactions(happened_at, kind, category);
+            CREATE INDEX IF NOT EXISTS idx_health_logs ON health_logs(logged_at, metric);
             CREATE INDEX IF NOT EXISTS idx_automations_due ON automations(next_run_at, status);
             CREATE INDEX IF NOT EXISTS idx_automation_runs_id ON automation_runs(automation_id);
             """
@@ -346,6 +357,7 @@ def get_stats():
         contact_count = conn.execute("SELECT COUNT(*) AS count FROM contacts").fetchone()["count"]
         snippet_count = conn.execute("SELECT COUNT(*) AS count FROM snippets").fetchone()["count"]
         finance_transaction_count = conn.execute("SELECT COUNT(*) AS count FROM finance_transactions").fetchone()["count"]
+        health_log_count = conn.execute("SELECT COUNT(*) AS count FROM health_logs").fetchone()["count"]
         active_automation_count = conn.execute("SELECT COUNT(*) AS count FROM automations WHERE status = 'active'").fetchone()["count"]
 
     return {
@@ -360,6 +372,7 @@ def get_stats():
         "contacts": contact_count,
         "snippets": snippet_count,
         "finance_transactions": finance_transaction_count,
+        "health_logs": health_log_count,
         "active_automations": active_automation_count,
     }
 

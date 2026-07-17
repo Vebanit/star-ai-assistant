@@ -2,6 +2,7 @@ from collections import Counter
 
 import star_storage as storage
 import star_finance
+import star_health
 
 
 def command_summary():
@@ -87,6 +88,7 @@ def productivity_summary():
         done_reminders = conn.execute("SELECT COUNT(*) AS count FROM reminders WHERE status = 'done'").fetchone()["count"]
         calendar_events = conn.execute("SELECT COUNT(*) AS count FROM calendar_events WHERE status = 'scheduled'").fetchone()["count"]
         finance_transactions = conn.execute("SELECT COUNT(*) AS count FROM finance_transactions").fetchone()["count"]
+        health_logs = conn.execute("SELECT COUNT(*) AS count FROM health_logs").fetchone()["count"]
         active_automations = conn.execute("SELECT COUNT(*) AS count FROM automations WHERE status = 'active'").fetchone()["count"]
         automation_runs = conn.execute("SELECT COUNT(*) AS count FROM automation_runs").fetchone()["count"]
 
@@ -98,6 +100,7 @@ def productivity_summary():
         "done_reminders": done_reminders,
         "calendar_events": calendar_events,
         "finance_transactions": finance_transactions,
+        "health_logs": health_logs,
         "active_automations": active_automations,
         "automation_runs": automation_runs,
     }
@@ -138,6 +141,7 @@ def full_summary():
         "memory": memory_summary(),
         "conversation": conversation_summary(),
         "finance": star_finance.summary(),
+        "health": star_health.summary(),
         "recent_errors": recent_errors(),
     }
 
@@ -152,5 +156,6 @@ def format_summary(summary):
         f"{productivity['open_reminders']} open reminders, "
         f"{productivity['calendar_events']} calendar events, and "
         f"{productivity['active_automations']} active automations. "
-        f"Finance balance this month is {star_finance.format_money(summary['finance']['balance'])}."
+        f"Finance balance this month is {star_finance.format_money(summary['finance']['balance'])}. "
+        f"Today health logs: {summary['health']['total_logs']}."
     )
