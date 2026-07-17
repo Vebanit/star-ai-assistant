@@ -27,6 +27,9 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Clipboard and snippets helper for copy/read/paste plus reusable text templates.
 - Finance tracker for income, expenses, category breakdowns, monthly balance, and transaction history.
 - Health and habit tracker for water, mood, sleep, workout, weight, and daily wellness summaries.
+- Multilingual command normalization for Hinglish/Hindi/local phrases, with optional Groq-powered command translation.
+- Self-learning smart suggestions from usage patterns, tasks, reminders, health, finance, and recent errors.
+- Cloud/mobile/smart-home foundation with local cloud snapshots, mobile notification queue, integration registry, and Home Assistant hooks.
 - Browser tab controls, Google/DuckDuckGo search, and file download helper.
 - Media controls for play/pause, next/previous, YouTube, Spotify, Netflix, and VLC.
 - WhatsApp chat search/send helpers through WhatsApp Web.
@@ -155,6 +158,17 @@ python wake_word.py
 - `health summary`
 - `show health logs`
 - `delete health log 1`
+- `chrome kholo`
+- `aaj ka agenda`
+- `suggestion do`
+- `smart suggestions`
+- `dismiss suggestion log_water`
+- `integration status`
+- `cloud sync now`
+- `send mobile notification STAR message Check your tasks`
+- `mobile notifications`
+- `smart home status`
+- `smart home turn on light.kitchen` then `confirm` or `cancel`
 - `start pomodoro 25`
 - `pomodoro status`
 - `open website openai.com`
@@ -281,6 +295,19 @@ python wake_word.py
 - `GET /health/logs` - list health logs.
 - `GET /health/summary` - today health summary.
 - `DELETE /health/logs/1` - delete a health log.
+- `GET /suggestions` - smart suggestions generated from local usage and activity.
+- `POST /suggestions/feedback?key=log_water&action=dismiss` - save suggestion feedback.
+- `GET /integrations/status` - cloud/mobile/smart-home configuration status.
+- `POST /integrations?name=home&kind=smart_home` - save a planned integration.
+- `GET /integrations` - list saved integrations.
+- `DELETE /integrations/1` - delete a saved integration.
+- `POST /cloud/sync` - write a local cloud-sync snapshot.
+- `GET /mobile/notifications` - list queued mobile notifications.
+- `POST /mobile/notifications?title=STAR&body=Hello` - queue a mobile notification.
+- `POST /mobile/notifications/1/read` - mark mobile notification read.
+- `DELETE /mobile/notifications/1` - delete mobile notification.
+- `GET /smart-home/status` - Home Assistant status if configured.
+- `POST /smart-home/service?domain=light&service=turn_on&entity_id=light.kitchen` - call a Home Assistant service.
 - `POST /pomodoro/start?minutes=25` - start Pomodoro.
 - `GET /pomodoro` - Pomodoro status.
 - `POST /browser/open?target=openai.com` - open website/search target.
@@ -349,6 +376,9 @@ python wake_word.py
 - Email send can use a saved contact name if the contact has an email address.
 - Clipboard paste actions type into the currently active app, so STAR asks for confirmation in normal/strict security modes.
 - Health logs are personal tracking only, not medical advice.
+- Multilingual support uses local Hinglish/Hindi mappings first; if Groq is configured, STAR can normalize broader language commands before routing.
+- Smart-home control uses Home Assistant env keys `HOME_ASSISTANT_URL` and `HOME_ASSISTANT_TOKEN`; device actions require confirmation.
+- Cloud sync writes local snapshots to `CLOUD_SYNC_DIR` or `cloud_sync/`; mobile support exposes a notification queue for a future app/client.
 - WhatsApp send/search requires WhatsApp Web login and may need selector updates if WhatsApp changes its UI.
 - Security modes: `relaxed` confirms only highest-risk actions, `normal` confirms messaging/download/automation/power/git write actions, and `strict` confirms every recognized risky action.
 - Keep `.env` private.

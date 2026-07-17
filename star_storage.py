@@ -137,6 +137,33 @@ def init_db():
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS suggestion_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                suggestion_key TEXT NOT NULL,
+                action TEXT NOT NULL,
+                details TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS integrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'planned',
+                config_json TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mobile_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'queued',
+                created_at TEXT NOT NULL,
+                read_at TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS automations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -178,6 +205,9 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name);
             CREATE INDEX IF NOT EXISTS idx_finance_happened ON finance_transactions(happened_at, kind, category);
             CREATE INDEX IF NOT EXISTS idx_health_logs ON health_logs(logged_at, metric);
+            CREATE INDEX IF NOT EXISTS idx_suggestion_feedback ON suggestion_feedback(suggestion_key, action);
+            CREATE INDEX IF NOT EXISTS idx_integrations_kind ON integrations(kind, status);
+            CREATE INDEX IF NOT EXISTS idx_mobile_notifications_status ON mobile_notifications(status, created_at);
             CREATE INDEX IF NOT EXISTS idx_automations_due ON automations(next_run_at, status);
             CREATE INDEX IF NOT EXISTS idx_automation_runs_id ON automation_runs(automation_id);
             """
@@ -358,6 +388,9 @@ def get_stats():
         snippet_count = conn.execute("SELECT COUNT(*) AS count FROM snippets").fetchone()["count"]
         finance_transaction_count = conn.execute("SELECT COUNT(*) AS count FROM finance_transactions").fetchone()["count"]
         health_log_count = conn.execute("SELECT COUNT(*) AS count FROM health_logs").fetchone()["count"]
+        suggestion_feedback_count = conn.execute("SELECT COUNT(*) AS count FROM suggestion_feedback").fetchone()["count"]
+        integration_count = conn.execute("SELECT COUNT(*) AS count FROM integrations").fetchone()["count"]
+        mobile_notification_count = conn.execute("SELECT COUNT(*) AS count FROM mobile_notifications WHERE status = 'queued'").fetchone()["count"]
         active_automation_count = conn.execute("SELECT COUNT(*) AS count FROM automations WHERE status = 'active'").fetchone()["count"]
 
     return {
@@ -373,6 +406,9 @@ def get_stats():
         "snippets": snippet_count,
         "finance_transactions": finance_transaction_count,
         "health_logs": health_log_count,
+        "suggestion_feedback": suggestion_feedback_count,
+        "integrations": integration_count,
+        "mobile_notifications": mobile_notification_count,
         "active_automations": active_automation_count,
     }
 

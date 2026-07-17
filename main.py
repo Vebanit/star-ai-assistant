@@ -44,6 +44,9 @@ import star_contacts
 import star_clipboard
 import star_finance
 import star_health
+import star_integrations
+import star_language
+import star_suggestions
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1300,6 +1303,92 @@ def handle_health_command(command):
     return None
 
 
+# ------------------- SUGGESTIONS + INTEGRATIONS -------------------
+
+def handle_suggestions_command(command):
+    text = command.strip().lower()
+
+    if text in {"smart suggestions", "suggestions", "show suggestions", "what should i do", "learn from me"}:
+        return star_suggestions.format_suggestions(star_suggestions.generate_suggestions(limit=5))
+
+    if text.startswith(("dismiss suggestion", "snooze suggestion", "accept suggestion")):
+        action = "accept"
+        if text.startswith("dismiss"):
+            action = "dismiss"
+        elif text.startswith("snooze"):
+            action = "snooze"
+        key = text_after_any(command, ["dismiss suggestion", "snooze suggestion", "accept suggestion"]).strip()
+        if not key:
+            return "Tell me the suggestion key to update."
+        star_suggestions.add_feedback(key, action)
+        return f"Suggestion {action} saved."
+
+    return None
+
+
+def parse_mobile_notification(text):
+    lower_text = text.lower()
+    if " message " in lower_text:
+        index = lower_text.index(" message ")
+        title = text_after_any(text[:index], ["send mobile notification", "mobile notify"]).strip() or "STAR"
+        body = text[index + len(" message "):].strip()
+        return title, body
+    payload = text_after_any(text, ["send mobile notification", "mobile notify"]).strip()
+    return "STAR", payload
+
+
+def handle_integrations_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text in {"integration status", "integrations status", "cloud status", "mobile status", "smart home status"}:
+        return star_integrations.format_status(star_integrations.integration_status())
+
+    if lower_text in {"cloud sync", "cloud sync now", "sync cloud"}:
+        result = star_integrations.cloud_sync_snapshot(BASE_DIR)
+        return f"Cloud snapshot saved to {result['path']}."
+
+    if lower_text in {"mobile notifications", "show mobile notifications"}:
+        items = star_integrations.list_mobile_notifications(limit=10)
+        if not items:
+            return "No mobile notifications queued."
+        return "Mobile notifications: " + ", ".join(f"{item['id']}: {item['title']}" for item in items[:8]) + "."
+
+    if lower_text.startswith(("send mobile notification", "mobile notify")):
+        title, body = parse_mobile_notification(text)
+        if not body:
+            return "Tell me the mobile notification message."
+        notification_id = star_integrations.queue_mobile_notification(title, body)
+        return f"Mobile notification {notification_id} queued."
+
+    if lower_text.startswith(("smart home turn on", "smart home turn off")):
+        service = "turn_on" if lower_text.startswith("smart home turn on") else "turn_off"
+        entity_id = text_after_any(text, ["smart home turn on", "smart home turn off"]).strip()
+        if not entity_id:
+            return "Tell me the smart home entity id, like light.kitchen."
+        domain = entity_id.split(".", 1)[0] if "." in entity_id else "homeassistant"
+        result = star_integrations.call_home_assistant_service(domain, service, entity_id=entity_id)
+        return f"Smart home {service.replace('_', ' ')} result: {result['status']}."
+
+    if lower_text.startswith("add integration"):
+        payload = text_after_any(text, ["add integration"]).strip()
+        if not payload:
+            return "Tell me integration name and type."
+        parts = payload.split()
+        name = parts[0]
+        kind = parts[1] if len(parts) > 1 else "general"
+        integration_id = star_integrations.save_integration(name, kind)
+        return f"Integration {integration_id} saved as planned."
+
+    if lower_text in {"list integrations", "show integrations"}:
+        items = star_integrations.list_integrations(limit=10)
+        if not items:
+            return "No integrations saved yet."
+        return "Integrations: " + ", ".join(f"{item['id']}: {item['name']} ({item['kind']})" for item in items[:8]) + "."
+
+    return None
+
+
 # ------------------- CODING + GIT AGENTS -------------------
 
 def handle_coding_command(command):
@@ -1665,6 +1754,8 @@ TOOLS = {
     "clipboard",
     "finance",
     "health",
+    "suggestions",
+    "integrations",
     "none",
 }
 
@@ -2019,6 +2110,41 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in health_phrases):
         return "health"
 
+    suggestion_phrases = [
+        "smart suggestions",
+        "suggestions",
+        "show suggestions",
+        "what should i do",
+        "learn from me",
+        "dismiss suggestion",
+        "snooze suggestion",
+        "accept suggestion",
+    ]
+    if any(text.startswith(phrase) or text == phrase for phrase in suggestion_phrases):
+        return "suggestions"
+
+    integration_phrases = [
+        "integration status",
+        "integrations status",
+        "cloud status",
+        "mobile status",
+        "smart home status",
+        "cloud sync",
+        "cloud sync now",
+        "sync cloud",
+        "mobile notifications",
+        "show mobile notifications",
+        "send mobile notification",
+        "mobile notify",
+        "smart home turn on",
+        "smart home turn off",
+        "add integration",
+        "list integrations",
+        "show integrations",
+    ]
+    if any(text.startswith(phrase) or text == phrase for phrase in integration_phrases):
+        return "integrations"
+
     if text.startswith(("search", "google", "find")):
         return "search"
 
@@ -2081,6 +2207,8 @@ contacts
 clipboard
 finance
 health
+suggestions
+integrations
 none
 
 Reply ONLY with one tool name.
@@ -2174,6 +2302,12 @@ def run_tool(tool, command):
 
     if tool == "health":
         return handle_health_command(command)
+
+    if tool == "suggestions":
+        return handle_suggestions_command(command)
+
+    if tool == "integrations":
+        return handle_integrations_command(command)
 
     return None
 
@@ -2352,40 +2486,45 @@ def ask_star(user_text):
         speak(confirmation_reply)
         return record_interaction(text, "confirmation", "ok", confirmation_reply)
 
-    memory_callback = lambda: handle_memory_command(text)
-    if star_security.classify_command(text)["requires_confirmation"] and any(
-        category == "memory_clear" for category in star_security.classify_command(text)["categories"]
+    action_text = star_language.normalize_command(text, client=client)
+    lower_action_text = action_text.lower()
+    if action_text != text:
+        storage.add_log("info", "language_normalized", {"original": text, "normalized": action_text})
+
+    memory_callback = lambda: handle_memory_command(action_text)
+    if star_security.classify_command(action_text)["requires_confirmation"] and any(
+        category == "memory_clear" for category in star_security.classify_command(action_text)["categories"]
     ):
-        memory_reply = security_gate(text, "memory", memory_callback)
+        memory_reply = security_gate(action_text, "memory", memory_callback)
     else:
         memory_reply = memory_callback()
     if memory_reply:
         speak(memory_reply)
         return record_interaction(text, "memory", "ok", memory_reply)
 
-    if open_chrome_and_search(text):
+    if open_chrome_and_search(action_text):
         return record_interaction(text, "search", "ok", "Done.")
 
-    tool = agent_brain(text)
+    tool = agent_brain(action_text)
     if tool != "none":
-        if tool in {"whatsapp", "browser", "automation", "email", "clipboard"}:
-            tool_reply = security_gate(text, tool, lambda: run_tool(tool, text))
+        if tool in {"whatsapp", "browser", "automation", "email", "clipboard", "integrations"}:
+            tool_reply = security_gate(action_text, tool, lambda: run_tool(tool, action_text))
         else:
-            tool_reply = run_tool(tool, text)
+            tool_reply = run_tool(tool, action_text)
         if tool_reply:
             return record_interaction(text, tool, "ok", tool_reply)
 
     extract_memory(text)
 
-    direct = check_direct_memory(text)
+    direct = check_direct_memory(action_text)
     if direct:
         reply = f"It is {direct}."
         speak(reply)
         return record_interaction(text, "memory", "ok", reply)
 
     internet_data = ""
-    if any(word in lower_text for word in ["latest", "today", "news", "price"]):
-        internet_data = search_internet(text)
+    if any(word in lower_action_text for word in ["latest", "today", "news", "price"]):
+        internet_data = search_internet(action_text)
 
     if not client:
         reply = "Groq API key is missing, so I can only run local commands right now."
@@ -2882,6 +3021,74 @@ def health_summary(day: str = "today"):
 @app.delete("/health/logs/{log_id}")
 def health_logs_delete(log_id: int):
     return {"status": "deleted" if star_health.delete_log(log_id) else "not_found", "id": log_id}
+
+
+@app.get("/suggestions")
+def suggestions_list(limit: int = 10):
+    return {"items": star_suggestions.generate_suggestions(limit=limit)}
+
+
+@app.post("/suggestions/feedback")
+def suggestions_feedback(key: str, action: str = "accept", details: Optional[str] = None):
+    star_suggestions.add_feedback(key, action, details=details)
+    return {"status": "saved", "key": key, "action": action}
+
+
+@app.get("/integrations/status")
+def integrations_status():
+    return star_integrations.integration_status()
+
+
+@app.post("/integrations")
+def integrations_create(name: str, kind: str, status: str = "planned"):
+    integration_id = star_integrations.save_integration(name, kind, status=status)
+    return {"status": "saved" if integration_id else "ignored", "id": integration_id}
+
+
+@app.get("/integrations")
+def integrations_list(kind: Optional[str] = None, limit: int = 50):
+    return {"items": star_integrations.list_integrations(kind=kind, limit=limit)}
+
+
+@app.delete("/integrations/{integration_id}")
+def integrations_delete(integration_id: int):
+    return {"status": "deleted" if star_integrations.delete_integration(integration_id) else "not_found", "id": integration_id}
+
+
+@app.post("/cloud/sync")
+def cloud_sync():
+    return star_integrations.cloud_sync_snapshot(BASE_DIR)
+
+
+@app.get("/mobile/notifications")
+def mobile_notifications(status: str = "queued", limit: int = 50):
+    return {"items": star_integrations.list_mobile_notifications(status=status, limit=limit)}
+
+
+@app.post("/mobile/notifications")
+def mobile_notification_create(title: str, body: str):
+    notification_id = star_integrations.queue_mobile_notification(title, body)
+    return {"status": "queued" if notification_id else "ignored", "id": notification_id}
+
+
+@app.post("/mobile/notifications/{notification_id}/read")
+def mobile_notification_read(notification_id: int):
+    return {"status": "read" if star_integrations.mark_mobile_notification_read(notification_id) else "not_found", "id": notification_id}
+
+
+@app.delete("/mobile/notifications/{notification_id}")
+def mobile_notification_delete(notification_id: int):
+    return {"status": "deleted" if star_integrations.delete_mobile_notification(notification_id) else "not_found", "id": notification_id}
+
+
+@app.get("/smart-home/status")
+def smart_home_status():
+    return star_integrations.home_assistant_status()
+
+
+@app.post("/smart-home/service")
+def smart_home_service(domain: str, service: str, entity_id: Optional[str] = None):
+    return star_integrations.call_home_assistant_service(domain, service, entity_id=entity_id)
 
 
 @app.get("/files/search")

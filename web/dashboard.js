@@ -48,6 +48,8 @@ function renderMetrics(health) {
     ["Snippets", health.snippets],
     ["Finance", health.finance_transactions],
     ["Health", health.health_logs],
+    ["Integrations", health.integrations],
+    ["Mobile Queue", health.mobile_notifications],
     ["Tasks", health.open_tasks],
     ["Reminders", health.open_reminders],
     ["Calendar", health.upcoming_calendar_events],

@@ -15,6 +15,10 @@ SECRET_KEYS = [
     "EMAIL_APP_PASSWORD",
     "GMAIL_ADDRESS",
     "GMAIL_APP_PASSWORD",
+    "HOME_ASSISTANT_URL",
+    "HOME_ASSISTANT_TOKEN",
+    "MOBILE_SHARED_SECRET",
+    "CLOUD_SYNC_DIR",
 ]
 
 RISKY_PATTERNS = {
@@ -23,6 +27,7 @@ RISKY_PATTERNS = {
     "messaging": ["send whatsapp", "whatsapp message to", "send message to"],
     "email": ["send email", "send mail", "delete email", "archive email"],
     "clipboard": ["paste text", "paste snippet"],
+    "smart_home": ["smart home turn on", "smart home turn off"],
     "browser_download": ["download file"],
     "automation": ["run automations", "run due automations", "create workflow", "schedule command"],
     "memory_clear": ["clear memory", "clear my memory", "forget all memory"],
@@ -57,12 +62,12 @@ def classify_command(command, tool=None):
 
     mode = get_mode()
     if mode == "relaxed":
-        requires_confirmation = any(category in {"power", "git_write", "file_write", "memory_clear", "email", "clipboard"} for category in matched)
+        requires_confirmation = any(category in {"power", "git_write", "file_write", "memory_clear", "email", "clipboard", "smart_home"} for category in matched)
     elif mode == "strict":
         requires_confirmation = True
     else:
         requires_confirmation = any(
-            category in {"power", "git_write", "messaging", "email", "clipboard", "browser_download", "automation", "memory_clear", "file_write"}
+            category in {"power", "git_write", "messaging", "email", "clipboard", "smart_home", "browser_download", "automation", "memory_clear", "file_write"}
             for category in matched
         )
 
