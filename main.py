@@ -3394,6 +3394,23 @@ def voice_resume():
     return {"status": "resumed", "voice_quiet": False, "reply": reply}
 
 
+@app.post("/voice/wake")
+def voice_wake():
+    settings = star_voice.get_settings()
+    if star_voice.is_voice_quiet(settings):
+        return {"status": "quiet", "spoken": False}
+    language = settings.get("response_language", "auto")
+    if language == "hindi":
+        reply = "Haan, boliye."
+    elif language == "hinglish":
+        reply = "Haan bhai, bol."
+    else:
+        reply = "Yes, I am listening."
+    spoken = speak(reply)
+    star_voice.remember_interaction("wake", reply)
+    return {"status": "awake", "spoken": spoken, "reply": reply}
+
+
 @app.post("/voice/sleep")
 def voice_sleep():
     star_voice.set_voice_quiet(False)

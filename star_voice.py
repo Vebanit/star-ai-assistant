@@ -15,7 +15,7 @@ DEFAULT_SETTINGS = {
     "voice_spoken_confirmations": "true",
     "voice_quiet": "false",
     "wake_engine": "auto",
-    "wake_phrases": "hello star,hey star,ok star,okay star,chal star,star,sitar,sitara,ok sar,ok sir",
+    "wake_phrases": "hello,hello star,hey star,ok star,okay star,chal star,star,sitar,sitara,ok sar,ok sir",
     "tts_voice": "en-US-JennyNeural",
     "tts_rate": "+5%",
     "tts_pitch": "+0Hz",
@@ -306,6 +306,7 @@ def clean_transcript(text):
     clean = clean.replace("’", "'").replace("`", "'")
 
     wake_prefixes = [
+        "hello",
         "hello star",
         "hey star",
         "ok star",

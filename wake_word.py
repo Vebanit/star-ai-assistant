@@ -162,6 +162,8 @@ def listen_for_speech_wake():
         conversation_mode = True
         if immediate_command:
             handle_spoken_command(immediate_command, used_language)
+        else:
+            call_star("/voice/wake", method="post")
         listen_continuous()
 
 
