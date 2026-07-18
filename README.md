@@ -101,6 +101,8 @@ http://127.0.0.1:8000/mobile
 
 Use `.\scripts\status_star.ps1` to see your phone-ready Mobile companion URL. From your phone, connect to the same Wi-Fi and open the `http://YOUR-LAPTOP-IP:8000/mobile` URL. Tap `Start Wake`, allow microphone access, then say `hello star`. Mobile browser microphone wake mode may need a secure browser context depending on the phone/browser.
 
+Mobile web commands run through the laptop STAR server, but replies are spoken on the phone page. Full phone system control needs a native Android companion or Termux bridge because mobile browsers cannot access the whole phone system.
+
 6. Install auto-start once.
 
 ```powershell

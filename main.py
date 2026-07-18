@@ -1,3 +1,4 @@
+import contextvars
 import datetime
 import difflib
 import glob
@@ -67,6 +68,7 @@ current_process = None
 PENDING_CONFIRMATION = None
 SPEECH_CONTEXT = None
 ADAPTED_REPLY_CACHE = {}
+SUPPRESS_TTS = contextvars.ContextVar("SUPPRESS_TTS", default=False)
 
 
 def infer_memory_category(key):
@@ -135,6 +137,9 @@ def speak(text):
     global current_process
 
     if not text:
+        return False
+
+    if SUPPRESS_TTS.get():
         return False
 
     if star_voice.is_voice_quiet():
@@ -3528,7 +3533,11 @@ def mobile_command(command: str, secret: Optional[str] = None):
     if not star_integrations.validate_mobile_secret(secret):
         storage.add_log("warning", "mobile_auth_failed", {"endpoint": "command"})
         return {"authorized": False, "reply": "", "error": "invalid_secret"}
-    reply = ask_star(command)
+    tts_token = SUPPRESS_TTS.set(True)
+    try:
+        reply = ask_star(command)
+    finally:
+        SUPPRESS_TTS.reset(tts_token)
     settings = star_voice.get_settings()
     return {
         "authorized": True,

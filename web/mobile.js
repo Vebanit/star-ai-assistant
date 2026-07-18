@@ -90,7 +90,11 @@ function setUi() {
 }
 
 function speakMobile(text) {
-  if (!("speechSynthesis" in window) || !text) return;
+  if (!text) return;
+  if (!("speechSynthesis" in window)) {
+    $("#replyBox").textContent = `${text}\n\nPhone speech is not available in this browser.`;
+    return;
+  }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = $("#languageSelect").value || "en-IN";
