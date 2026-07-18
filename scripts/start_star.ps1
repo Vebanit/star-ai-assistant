@@ -25,6 +25,18 @@ function Test-StarBackend {
     }
 }
 
+function Get-StarLanUrls {
+    $ips = Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object {
+            $_.IPAddress -ne "127.0.0.1" -and
+            $_.IPAddress -notlike "169.254.*" -and
+            $_.IPAddress -notlike "0.*"
+        } |
+        Select-Object -ExpandProperty IPAddress
+
+    return $ips | ForEach-Object { "http://${_}:8000/mobile" }
+}
+
 function Test-RunningPid {
     param([string]$PidFile)
     if (!(Test-Path $PidFile)) {
@@ -44,7 +56,7 @@ if (Test-StarBackend) {
 } else {
     $backend = Start-Process `
         -FilePath $Python `
-        -ArgumentList @("-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000") `
+        -ArgumentList @("-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000") `
         -WorkingDirectory $ProjectRoot `
         -WindowStyle Hidden `
         -RedirectStandardOutput $BackendLog `
@@ -86,3 +98,8 @@ if (Test-RunningPid $WakePidFile) {
 }
 
 Write-Host "STAR is ready. Dashboard: http://127.0.0.1:8000/dashboard"
+$mobileUrls = Get-StarLanUrls
+if ($mobileUrls) {
+    Write-Host "Mobile companion URLs:"
+    $mobileUrls | ForEach-Object { Write-Host $_ }
+}

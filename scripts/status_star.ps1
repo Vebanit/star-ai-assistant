@@ -19,6 +19,18 @@ function Get-PidStatus {
     return "${Name}: running (PID $processId)"
 }
 
+function Get-StarLanUrls {
+    $ips = Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object {
+            $_.IPAddress -ne "127.0.0.1" -and
+            $_.IPAddress -notlike "169.254.*" -and
+            $_.IPAddress -notlike "0.*"
+        } |
+        Select-Object -ExpandProperty IPAddress
+
+    return $ips | ForEach-Object { "http://${_}:8000/mobile" }
+}
+
 try {
     $health = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8000/health" -TimeoutSec 2
     $backendHealth = "Backend health: $($health.StatusCode)"
@@ -37,3 +49,8 @@ if (Test-Path $WakeErrorLog) {
     }
 }
 Write-Host "Dashboard: http://127.0.0.1:8000/dashboard"
+$mobileUrls = Get-StarLanUrls
+if ($mobileUrls) {
+    Write-Host "Mobile companion URLs:"
+    $mobileUrls | ForEach-Object { Write-Host $_ }
+}
