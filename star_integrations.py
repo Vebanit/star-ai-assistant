@@ -1,5 +1,6 @@
 import json
 import os
+import secrets
 import time
 from pathlib import Path
 
@@ -35,17 +36,18 @@ def request_with_retry(method, url, attempts=2, **kwargs):
 
 
 def integration_status():
+    mobile_secret = mobile_shared_secret()
     return {
         "cloud": {
             "configured": bool(os.getenv("CLOUD_SYNC_DIR")),
             "sync_dir": os.getenv("CLOUD_SYNC_DIR") or "cloud_sync",
         },
         "mobile": {
-            "configured": bool(os.getenv("MOBILE_SHARED_SECRET")),
+            "configured": bool(mobile_secret),
             "queued_notifications": len(list_mobile_notifications(status="queued", limit=100)),
             "registered_devices": len(list_mobile_devices(limit=100)),
             "queued_actions": len(list_mobile_actions(status="queued", limit=100)),
-            "auth": "shared_secret" if os.getenv("MOBILE_SHARED_SECRET") else "local_open",
+            "auth": "shared_secret" if mobile_secret else "local_open",
         },
         "smart_home": {
             "configured": bool(os.getenv("HOME_ASSISTANT_URL") and os.getenv("HOME_ASSISTANT_TOKEN")),
@@ -134,10 +136,21 @@ def queue_mobile_notification(title, body):
 
 
 def validate_mobile_secret(secret=None):
-    expected = os.getenv("MOBILE_SHARED_SECRET")
+    expected = mobile_shared_secret()
     if not expected:
         return True
     return str(secret or "") == expected
+
+
+def mobile_shared_secret():
+    return os.getenv("MOBILE_SHARED_SECRET") or storage.get_setting("mobile_shared_secret", "")
+
+
+def regenerate_mobile_secret():
+    secret = secrets.token_urlsafe(24)
+    storage.set_setting("mobile_shared_secret", secret)
+    storage.add_log("warning", "mobile_secret_regenerated")
+    return secret
 
 
 def mobile_pull(secret=None, limit=20):

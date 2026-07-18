@@ -41,6 +41,8 @@ export STAR_DEVICE_NAME="Bajrangi Phone"
 python termux_star_bridge.py
 ```
 
+The easier secure path is to open STAR Dashboard > Integrations > Phone Bridge, click `Rotate Secret`, copy the generated commands, and paste them in Termux.
+
 If you set `MOBILE_SHARED_SECRET` in the laptop `.env`, set the same value on the phone:
 
 ```sh

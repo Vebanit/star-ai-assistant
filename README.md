@@ -105,6 +105,7 @@ Use `.\scripts\status_star.ps1` to see your phone-ready Mobile companion URL. Fr
 Mobile web commands run through the laptop STAR server, but replies are spoken on the phone page. Full phone system control needs a native Android companion or Termux bridge because mobile browsers cannot access the whole phone system.
 
 Android phone bridge setup is in `mobile_bridge/README.md`.
+For secure pairing, open the dashboard Integrations tab, use `Rotate Secret`, then copy the generated Termux commands into the phone.
 
 6. Install auto-start once.
 

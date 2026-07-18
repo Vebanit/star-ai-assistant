@@ -4,6 +4,7 @@ import difflib
 import glob
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -15,7 +16,7 @@ import psutil
 import pyautogui
 from ddgs import DDGS
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from groq import Groq
@@ -1532,6 +1533,55 @@ def parse_mobile_notification(text):
         return title, body
     payload = text_after_any(text, ["send mobile notification", "mobile notify"]).strip()
     return "STAR", payload
+
+
+def mobile_lan_urls(port=8000):
+    ips = set()
+    try:
+        for item in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = item[4][0]
+            if ip and ip != "127.0.0.1" and not ip.startswith("169.254.") and not ip.startswith("0."):
+                ips.add(ip)
+    except OSError:
+        pass
+    return [f"http://{ip}:{port}" for ip in sorted(ips)]
+
+
+def is_local_request(request):
+    client_host = request.client.host if request.client else ""
+    return client_host in {"127.0.0.1", "::1", "localhost"}
+
+
+def mobile_dashboard_authorized(request, secret=None):
+    return is_local_request(request) or star_integrations.validate_mobile_secret(secret)
+
+
+def mobile_pairing_payload(base_url=None, include_secret=True):
+    secret = star_integrations.mobile_shared_secret()
+    urls = mobile_lan_urls()
+    final_base_url = (base_url or (urls[0] if urls else "http://YOUR-LAPTOP-IP:8000")).rstrip("/")
+    commands = [
+        "pkg update",
+        "pkg install -y python termux-api",
+        f"export STAR_BASE_URL=\"{final_base_url}\"",
+        "export STAR_DEVICE_ID=\"bajrangi_phone\"",
+        "export STAR_DEVICE_NAME=\"Bajrangi Phone\"",
+    ]
+    if secret and include_secret:
+        commands.append(f"export MOBILE_SHARED_SECRET=\"{secret}\"")
+    elif secret:
+        commands.append("export MOBILE_SHARED_SECRET=\"YOUR_PAIRING_SECRET\"")
+    commands.append("python termux_star_bridge.py")
+    return {
+        "secret_configured": bool(secret),
+        "auth": "shared_secret" if secret else "local_open",
+        "secret": secret if include_secret else "",
+        "base_url": final_base_url,
+        "base_urls": urls,
+        "mobile_url": f"{final_base_url}/mobile",
+        "termux_commands": commands,
+        "termux_command_text": "\n".join(commands),
+    }
 
 
 def queue_phone_action_reply(action, payload=None):
@@ -3629,6 +3679,24 @@ def mobile_status(secret: Optional[str] = None):
     }
 
 
+@app.get("/mobile/pairing")
+def mobile_pairing(request: Request, base_url: Optional[str] = None, secret: Optional[str] = None):
+    request_base_url = str(request.base_url).rstrip("/")
+    include_secret = is_local_request(request) or star_integrations.validate_mobile_secret(secret)
+    return mobile_pairing_payload(base_url=base_url or request_base_url, include_secret=include_secret)
+
+
+@app.post("/mobile/pairing/regenerate")
+def mobile_pairing_regenerate(request: Request, base_url: Optional[str] = None, secret: Optional[str] = None):
+    existing_secret = star_integrations.mobile_shared_secret()
+    if not is_local_request(request) and (not existing_secret or not star_integrations.validate_mobile_secret(secret)):
+        storage.add_log("warning", "mobile_pairing_regenerate_denied", {"client": request.client.host if request.client else ""})
+        return {"authorized": False, "error": "local_dashboard_or_valid_secret_required"}
+    star_integrations.regenerate_mobile_secret()
+    request_base_url = str(request.base_url).rstrip("/")
+    return mobile_pairing_payload(base_url=base_url or request_base_url, include_secret=True)
+
+
 @app.post("/mobile/devices/register")
 def mobile_device_register(
     device_id: str,
@@ -3645,16 +3713,16 @@ def mobile_device_register(
 
 
 @app.get("/mobile/devices")
-def mobile_devices(secret: Optional[str] = None, limit: int = 50):
-    if not star_integrations.validate_mobile_secret(secret):
+def mobile_devices(request: Request, secret: Optional[str] = None, limit: int = 50):
+    if not mobile_dashboard_authorized(request, secret):
         storage.add_log("warning", "mobile_auth_failed", {"endpoint": "devices"})
         return {"authorized": False, "items": [], "error": "invalid_secret"}
     return {"authorized": True, "items": star_integrations.list_mobile_devices(limit=limit)}
 
 
 @app.post("/mobile/actions")
-def mobile_action_create(action: str, payload: str = "", device_id: Optional[str] = None, secret: Optional[str] = None):
-    if not star_integrations.validate_mobile_secret(secret):
+def mobile_action_create(request: Request, action: str, payload: str = "", device_id: Optional[str] = None, secret: Optional[str] = None):
+    if not mobile_dashboard_authorized(request, secret):
         storage.add_log("warning", "mobile_auth_failed", {"endpoint": "action_create"})
         return {"authorized": False, "error": "invalid_secret"}
     action_id = star_integrations.queue_mobile_action(action, payload=payload, device_id=device_id)
@@ -3662,8 +3730,8 @@ def mobile_action_create(action: str, payload: str = "", device_id: Optional[str
 
 
 @app.get("/mobile/actions")
-def mobile_actions(status: str = "queued", limit: int = 50, secret: Optional[str] = None):
-    if not star_integrations.validate_mobile_secret(secret):
+def mobile_actions(request: Request, status: str = "queued", limit: int = 50, secret: Optional[str] = None):
+    if not mobile_dashboard_authorized(request, secret):
         storage.add_log("warning", "mobile_auth_failed", {"endpoint": "actions"})
         return {"authorized": False, "items": [], "error": "invalid_secret"}
     return {"authorized": True, "items": star_integrations.list_mobile_actions(status=status, limit=limit)}
@@ -3675,8 +3743,8 @@ def mobile_action_pull(device_id: str, secret: Optional[str] = None, limit: int 
 
 
 @app.post("/mobile/actions/{action_id}/complete")
-def mobile_action_complete(action_id: int, device_id: str, status: str = "done", result: str = "", secret: Optional[str] = None):
-    if not star_integrations.validate_mobile_secret(secret):
+def mobile_action_complete(request: Request, action_id: int, device_id: str, status: str = "done", result: str = "", secret: Optional[str] = None):
+    if not mobile_dashboard_authorized(request, secret):
         storage.add_log("warning", "mobile_auth_failed", {"endpoint": "action_complete"})
         return {"authorized": False, "error": "invalid_secret"}
     completed = star_integrations.complete_mobile_action(action_id, device_id=device_id, status=status, result=result)

@@ -281,14 +281,61 @@ function renderVoice(voice) {
   `;
 }
 
-function renderIntegrations(status, integrations, mobile, smartHome) {
+function phonePayloadForAction(action, value) {
+  const textValue = value.trim();
+  if (action === "speak") return { text: textValue || "Hello from STAR" };
+  if (action === "notify") return { title: "STAR", body: textValue || "Phone bridge test" };
+  if (action === "open_url") return { url: textValue || "https://google.com" };
+  if (action === "share_text") return { text: textValue || "Shared from STAR" };
+  return { duration_ms: 700 };
+}
+
+function renderPhoneBridge(pairing, devices, actions) {
+  const commandText = pairing.termux_command_text || "";
+  $("#phonePairingGrid").innerHTML = [
+    ["Auth", pairing.auth || "local_open"],
+    ["Secret", pairing.secret_configured ? "configured" : "not set"],
+    ["Mobile URL", pairing.mobile_url || "/mobile"],
+  ]
+    .map(([label, value]) => `<div class="system-item"><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></div>`)
+    .join("");
+  $("#phonePairingCommands").value = commandText;
+
+  $("#phoneDevicesList").innerHTML = (devices.items || [])
+    .map(
+      (item) => `
+        <div class="list-item">
+          <b>${escapeHtml(item.name)}</b>
+          <span>${escapeHtml(item.platform)} &middot; ${escapeHtml(item.status)}</span>
+          <div class="muted">${escapeHtml(item.device_id)} &middot; ${escapeHtml(item.last_seen_at)}</div>
+        </div>
+      `,
+    )
+    .join("") || `<div class="list-item">No phone bridge connected yet.</div>`;
+
+  $("#phoneActionsList").innerHTML = (actions.items || [])
+    .slice(0, 10)
+    .map(
+      (item) => `
+        <div class="list-item">
+          <b>#${item.id} ${escapeHtml(item.action)}</b>
+          <span>${escapeHtml(item.status)} &middot; ${escapeHtml(item.device_id || "any phone")}</span>
+          <div class="muted">${escapeHtml(item.created_at)}</div>
+        </div>
+      `,
+    )
+    .join("") || `<div class="list-item">No phone actions queued.</div>`;
+}
+
+function renderIntegrations(status, integrations, mobile, smartHome, pairing, devices, actions) {
   const cloud = status.cloud || {};
   const mobileStatus = status.mobile || {};
   const smartStatus = status.smart_home || {};
   const items = [
     ["Cloud", statusPill(cloud.configured ? "configured" : "local", true)],
     ["Sync Dir", escapeHtml(cloud.sync_dir || "cloud_sync")],
-    ["Mobile", `${mobileStatus.queued_notifications ?? 0} queued`],
+    ["Mobile", `${mobileStatus.queued_notifications ?? 0} notification(s)`],
+    ["Phone Bridge", `${mobileStatus.registered_devices ?? 0} device(s), ${mobileStatus.queued_actions ?? 0} action(s)`],
     ["Smart Home", statusPill(smartStatus.configured ? "configured" : "missing", !!smartStatus.configured)],
   ];
 
@@ -331,6 +378,8 @@ function renderIntegrations(status, integrations, mobile, smartHome) {
       `,
     )
     .join("") || `<div class="list-item">No saved integrations yet.</div>`;
+
+  renderPhoneBridge(pairing || {}, devices || { items: [] }, actions || { items: [] });
 }
 
 function renderSuggestions(items) {
@@ -386,6 +435,9 @@ async function refreshAll() {
     integrationStatus,
     integrations,
     mobile,
+    pairing,
+    phoneDevices,
+    phoneActions,
     smartHome,
   ] = await Promise.all([
     safeApi("/health", {}),
@@ -403,6 +455,9 @@ async function refreshAll() {
     safeApi("/integrations/status", { cloud: {}, mobile: {}, smart_home: {} }),
     safeApi("/integrations?limit=30", { items: [] }),
     safeApi("/mobile/notifications?status=queued&limit=20", { items: [] }),
+    safeApi("/mobile/pairing", { termux_command_text: "", base_urls: [] }),
+    safeApi("/mobile/devices?limit=10", { authorized: true, items: [] }),
+    safeApi("/mobile/actions?status=all&limit=20", { authorized: true, items: [] }),
     safeApi("/smart-home/status", { configured: false, status: "not_configured" }),
   ]);
 
@@ -418,7 +473,7 @@ async function refreshAll() {
   renderAnalytics(analytics);
   renderVoice(voice);
   renderSuggestions(suggestions.items);
-  renderIntegrations(integrationStatus, integrations, mobile, smartHome);
+  renderIntegrations(integrationStatus, integrations, mobile, smartHome, pairing, phoneDevices, phoneActions);
 }
 
 function switchView(view) {
@@ -559,6 +614,32 @@ function bindEvents() {
     await api(`/mobile/notifications?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`, { method: "POST" });
     $("#mobileTitle").value = "";
     $("#mobileBody").value = "";
+    await refreshAll();
+  });
+
+  $("#pairingRefreshBtn").addEventListener("click", refreshAll);
+  $("#phoneActionRefreshBtn").addEventListener("click", refreshAll);
+
+  $("#copyPairingBtn").addEventListener("click", async () => {
+    const textValue = $("#phonePairingCommands").value;
+    if (navigator.clipboard && textValue) {
+      await navigator.clipboard.writeText(textValue);
+      addMessage("assistant", "Phone bridge pairing commands copied.");
+    }
+  });
+
+  $("#rotatePairingBtn").addEventListener("click", async () => {
+    await api("/mobile/pairing/regenerate", { method: "POST" });
+    addMessage("assistant", "Mobile pairing secret rotated.");
+    await refreshAll();
+  });
+
+  $("#phoneActionForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const action = $("#phoneActionType").value;
+    const payload = JSON.stringify(phonePayloadForAction(action, $("#phoneActionPayload").value));
+    await api(`/mobile/actions?action=${encodeURIComponent(action)}&payload=${encodeURIComponent(payload)}`, { method: "POST" });
+    $("#phoneActionPayload").value = "";
     await refreshAll();
   });
 

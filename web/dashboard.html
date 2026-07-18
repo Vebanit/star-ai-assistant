@@ -293,6 +293,41 @@
             </form>
             <div class="list" id="integrationsList"></div>
           </section>
+
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Phone Bridge</h3>
+                <button class="button small secondary" id="pairingRefreshBtn">Pairing</button>
+              </div>
+              <div class="system-grid" id="phonePairingGrid"></div>
+              <textarea id="phonePairingCommands" rows="8" readonly></textarea>
+              <div class="control-strip">
+                <button class="button secondary" id="copyPairingBtn">Copy</button>
+                <button class="button danger" id="rotatePairingBtn">Rotate Secret</button>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Phone Actions</h3>
+                <button class="button small secondary" id="phoneActionRefreshBtn">Refresh</button>
+              </div>
+              <form class="stack-form compact-form" id="phoneActionForm">
+                <select id="phoneActionType">
+                  <option value="vibrate">Vibrate</option>
+                  <option value="speak">Speak</option>
+                  <option value="notify">Notify</option>
+                  <option value="open_url">Open URL</option>
+                  <option value="share_text">Share Text</option>
+                </select>
+                <input id="phoneActionPayload" type="text" placeholder="text, message, or url" />
+                <button class="button" type="submit">Queue Phone Action</button>
+              </form>
+              <div class="list dense" id="phoneDevicesList"></div>
+              <div class="list dense" id="phoneActionsList"></div>
+            </section>
+          </div>
         </section>
 
         <section class="view" id="suggestionsView">
