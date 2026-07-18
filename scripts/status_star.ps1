@@ -4,7 +4,9 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $RuntimeDir = Join-Path $ProjectRoot "runtime"
 $BackendPidFile = Join-Path $RuntimeDir "backend.pid"
 $WakePidFile = Join-Path $RuntimeDir "wake_word.pid"
+$WidgetPidFile = Join-Path $RuntimeDir "desktop_power_button.pid"
 $WakeErrorLog = Join-Path $RuntimeDir "wake_word.err.log"
+$WidgetErrorLog = Join-Path $RuntimeDir "desktop_power_button.err.log"
 
 function Get-PidStatus {
     param([string]$Name, [string]$PidFile)
@@ -41,11 +43,19 @@ try {
 Write-Host $backendHealth
 Write-Host (Get-PidStatus "Backend process" $BackendPidFile)
 Write-Host (Get-PidStatus "Wake listener" $WakePidFile)
+Write-Host (Get-PidStatus "Desktop power button" $WidgetPidFile)
 if (Test-Path $WakeErrorLog) {
     $wakeErrors = Get-Content $WakeErrorLog -Tail 5
     if ($wakeErrors) {
         Write-Host "Last wake listener error:"
         $wakeErrors | ForEach-Object { Write-Host $_ }
+    }
+}
+if (Test-Path $WidgetErrorLog) {
+    $widgetErrors = Get-Content $WidgetErrorLog -Tail 5
+    if ($widgetErrors) {
+        Write-Host "Last desktop button error:"
+        $widgetErrors | ForEach-Object { Write-Host $_ }
     }
 }
 Write-Host "Dashboard: http://127.0.0.1:8000/dashboard"

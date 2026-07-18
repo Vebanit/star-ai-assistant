@@ -3,6 +3,7 @@ $ErrorActionPreference = "SilentlyContinue"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $RuntimeDir = Join-Path $ProjectRoot "runtime"
 $PidFiles = @(
+    Join-Path $RuntimeDir "desktop_power_button.pid"
     Join-Path $RuntimeDir "wake_word.pid"
     Join-Path $RuntimeDir "backend.pid"
 )

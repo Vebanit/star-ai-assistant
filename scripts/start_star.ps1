@@ -4,14 +4,21 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $RuntimeDir = Join-Path $ProjectRoot "runtime"
 $BackendPidFile = Join-Path $RuntimeDir "backend.pid"
 $WakePidFile = Join-Path $RuntimeDir "wake_word.pid"
+$WidgetPidFile = Join-Path $RuntimeDir "desktop_power_button.pid"
 $BackendLog = Join-Path $RuntimeDir "backend.log"
 $BackendErrorLog = Join-Path $RuntimeDir "backend.err.log"
 $WakeLog = Join-Path $RuntimeDir "wake_word.log"
 $WakeErrorLog = Join-Path $RuntimeDir "wake_word.err.log"
+$WidgetLog = Join-Path $RuntimeDir "desktop_power_button.log"
+$WidgetErrorLog = Join-Path $RuntimeDir "desktop_power_button.err.log"
 $Python = Join-Path $ProjectRoot "venv\Scripts\python.exe"
+$Pythonw = Join-Path $ProjectRoot "venv\Scripts\pythonw.exe"
 
 if (!(Test-Path $Python)) {
     $Python = "python"
+}
+if (!(Test-Path $Pythonw)) {
+    $Pythonw = $Python
 }
 
 New-Item -ItemType Directory -Force -Path $RuntimeDir | Out-Null
@@ -94,6 +101,29 @@ if (Test-RunningPid $WakePidFile) {
         }
     } else {
         Write-Host "STAR wake listener started with PID $($wake.Id)"
+    }
+}
+
+if (Test-RunningPid $WidgetPidFile) {
+    Write-Host "STAR desktop power button already running."
+} else {
+    $widget = Start-Process `
+        -FilePath $Pythonw `
+        -ArgumentList @("desktop_power_button.py") `
+        -WorkingDirectory $ProjectRoot `
+        -RedirectStandardOutput $WidgetLog `
+        -RedirectStandardError $WidgetErrorLog `
+        -PassThru
+    Set-Content -Path $WidgetPidFile -Value $widget.Id
+    Start-Sleep -Seconds 1
+    if ($null -eq (Get-Process -Id $widget.Id -ErrorAction SilentlyContinue)) {
+        Write-Host "STAR desktop power button tried to start, but exited early."
+        if (Test-Path $WidgetErrorLog) {
+            Write-Host "Desktop button error:"
+            Get-Content $WidgetErrorLog -Tail 12
+        }
+    } else {
+        Write-Host "STAR desktop power button started with PID $($widget.Id)"
     }
 }
 
