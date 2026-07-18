@@ -14,7 +14,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Groq-powered assistant replies and action planning.
 - Edge TTS voice output.
 - Female Edge TTS voice by default, currently `en-US-JennyNeural`.
-- Emotion-aware replies that infer the user's tone and answer in the same language or style, including Hinglish, Hindi, Japanese, and other Groq-supported languages.
+- Emotion-aware replies that infer the user's tone and answer in the same language or style, with spoken Indian Hindi/Hinglish instead of stiff translation.
 - Persistent SQLite memory in `star.db`.
 - Conversation history, command history, and local logs.
 - Memory edit, recall, and forget commands.

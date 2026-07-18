@@ -2813,7 +2813,9 @@ Reply short and natural.
 Detect the user's language and reply in the same language/script.
 Detect the user's emotional tone and match it with empathy.
 If the user is excited, sound excited. If frustrated, be calm and helpful. If sad, be gentle.
-For Hinglish, reply in natural Hinglish.
+For Hinglish, reply like a real Indian friend: simple, warm, casual, not formal textbook Hindi.
+For Hindi, use normal spoken Hindi, not literal translation.
+Avoid robotic words like "sahayata pradan", "vartamaan", "kripya" unless the user is very formal.
 
 User: {text}
 """

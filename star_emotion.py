@@ -3,11 +3,11 @@ import re
 import star_storage as storage
 
 
-EXCITED_MARKERS = ["!", "wow", "yay", "awesome", "mast", "badhiya", "lets go", "chalo", "yess"]
-FRUSTRATED_MARKERS = ["angry", "gussa", "frustrated", "kyu", "why", "nahi ho raha", "not working", "bekar"]
-SAD_MARKERS = ["sad", "dukhi", "upset", "tired", "thak", "pareshan", "depressed"]
+EXCITED_MARKERS = ["!", "wow", "yay", "awesome", "mast", "badhiya", "lets go", "chalo", "yess", "maza", "sahi"]
+FRUSTRATED_MARKERS = ["angry", "gussa", "frustrated", "kyu", "why", "nahi ho raha", "not working", "bekar", "maza nahi", "yr", "yrr"]
+SAD_MARKERS = ["sad", "dukhi", "upset", "tired", "thak", "pareshan", "depressed", "udaas"]
 POLITE_MARKERS = ["please", "pls", "kripya", "kindly"]
-HINGLISH_MARKERS = ["bhai", "karo", "kar", "kya", "hai", "nahi", "haan", "bata", "kholo", "band"]
+HINGLISH_MARKERS = ["bhai", "karo", "kar", "kya", "hai", "nahi", "haan", "bata", "kholo", "band", "yr", "yrr", "smjha", "chahiye"]
 
 
 def detect_emotion(text):
@@ -61,12 +61,38 @@ def fallback_adapt(reply, user_text):
     hint = detect_language_hint(user_text)
     if hint == "Hinglish":
         if emotion == "excited":
-            return f"Haan bhai! {reply}"
+            return f"Haan bhai, mast! {reply}"
         if emotion == "frustrated":
-            return f"Samjha bhai, {reply}"
+            return f"Haan bhai samjha, {reply}"
         if emotion == "sad":
-            return f"Aram se bhai, {reply}"
+            return f"Aram se bhai, main hoon na. {reply}"
     return reply
+
+
+def style_instruction(language_hint):
+    if language_hint == "Hinglish":
+        return """
+Use natural Indian Hinglish, like a helpful friend.
+Avoid textbook Hindi and avoid stiff translation.
+Use simple words: haan, bhai, samjha, kar deta hoon, ho gaya, ek sec, tension mat le.
+Do not overuse bhai in every sentence; one time is enough.
+Examples:
+- "Done." -> "Ho gaya bhai."
+- "I could not reach the AI service right now." -> "Bhai abhi AI service connect nahi ho pa rahi."
+- "STAR server stays on." -> "Server background me on rahega bhai."
+"""
+    if language_hint == "Hindi":
+        return """
+Use normal spoken Hindi, not textbook/Google-Translate Hindi.
+Keep it warm and human, like a real assistant talking casually.
+Prefer everyday words: haan, theek hai, ho gaya, ruk, tension mat lo, main dekh raha hoon.
+Avoid formal words like "kripya", "vartamaan", "sahayata pradan", unless the user is formal.
+Examples:
+- "Done." -> "Ho gaya."
+- "I could not reach the AI service right now." -> "Abhi AI service se connection nahi ho pa raha."
+- "Tell me what to search." -> "Kya search karna hai, batao."
+"""
+    return "Use a natural, native-sounding conversational style for that language."
 
 
 def adapt_reply(reply, user_text, client=None):
@@ -83,12 +109,16 @@ def adapt_reply(reply, user_text, client=None):
 Rewrite STAR's reply for the user.
 
 Rules:
-- Reply in the same language/script as the user's message. If the user uses Japanese, reply in Japanese. If Hinglish, reply in natural Hinglish.
+- Reply in the same language/script as the user's message. If the user uses Japanese, reply in Japanese. If Hinglish, reply in Hinglish.
 - Match the user's emotional tone: {emotion}.
 - Keep the meaning and facts exactly the same.
 - Keep it short and natural.
 - Do not add new claims.
 - Do not mention translation, language detection, or emotion detection.
+- Do not sound robotic, formal, or like a literal translation.
+
+Style guide:
+{style_instruction(language_hint)}
 
 User message:
 {user_text}
