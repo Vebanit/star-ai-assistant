@@ -43,6 +43,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - WhatsApp persistent Chrome profile, login status checks, and better Selenium waits for WhatsApp Web.
 - Email IMAP/SMTP connection diagnostics, timeout settings, and retry handling.
 - Mobile companion at `/mobile` with wake listening, command sending, mobile speech replies, notifications, and optional shared-secret auth.
+- Android Termux bridge for phone-side actions such as speak, vibrate, notifications, URL/deep-link intents, share, call intent, and SMS intent.
 - Smart-home validation and retry handling for Home Assistant service calls.
 - Coding helper for project analysis, code search, explain/review file, and Python compile checks.
 - Git helper for status, log, diff, branch, remotes, and confirmed commit/pull/push.
@@ -102,6 +103,8 @@ http://127.0.0.1:8000/mobile
 Use `.\scripts\status_star.ps1` to see your phone-ready Mobile companion URL. From your phone, connect to the same Wi-Fi and open the `http://YOUR-LAPTOP-IP:8000/mobile` URL. Tap `Start Wake`, allow microphone access, then say `hello star`. Mobile browser microphone wake mode may need a secure browser context depending on the phone/browser.
 
 Mobile web commands run through the laptop STAR server, but replies are spoken on the phone page. Full phone system control needs a native Android companion or Termux bridge because mobile browsers cannot access the whole phone system.
+
+Android phone bridge setup is in `mobile_bridge/README.md`.
 
 6. Install auto-start once.
 
@@ -368,6 +371,9 @@ Voice behavior:
 - `GET /mobile` - mobile companion page.
 - `GET /mobile/status` - mobile companion status and wake phrases.
 - `POST /mobile/command?command=open chrome` - run a STAR command from mobile.
+- `POST /mobile/devices/register?device_id=my_phone` - register the Android bridge.
+- `GET /mobile/actions/pull?device_id=my_phone` - bridge pulls queued phone actions.
+- `POST /mobile/actions/1/complete?device_id=my_phone&status=done` - bridge reports action result.
 - `GET /mobile/notifications` - list queued mobile notifications.
 - `POST /mobile/notifications?title=STAR&body=Hello` - queue a mobile notification.
 - `POST /mobile/notifications/1/read` - mark mobile notification read.

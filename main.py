@@ -1534,12 +1534,90 @@ def parse_mobile_notification(text):
     return "STAR", payload
 
 
+def queue_phone_action_reply(action, payload=None):
+    devices = star_integrations.list_mobile_devices(limit=1)
+    device_id = devices[0]["device_id"] if devices else None
+    action_id = star_integrations.queue_mobile_action(action, payload or {}, device_id=device_id)
+    if not action_id:
+        return "I could not queue that phone action."
+    if not devices:
+        return f"Phone action {action_id} queued for the next connected phone. Start the Termux STAR bridge on your phone."
+    return f"Phone action {action_id} queued."
+
+
+def parse_phone_action_command(command):
+    text = command.strip()
+    lower_text = text.lower()
+
+    if lower_text in {"phone status", "mobile bridge status", "phone bridge status", "android status"}:
+        return star_integrations.format_mobile_bridge_status()
+
+    if lower_text in {"phone vibrate", "mobile vibrate", "vibrate phone"}:
+        return queue_phone_action_reply("vibrate", {"duration_ms": 700})
+
+    if lower_text.startswith(("phone speak", "mobile speak", "phone bolo", "mobile bolo")):
+        payload = text_after_any(text, ["phone speak", "mobile speak", "phone bolo", "mobile bolo"]).strip()
+        if not payload:
+            return "Tell me what the phone should say."
+        return queue_phone_action_reply("speak", {"text": payload})
+
+    if lower_text.startswith(("phone notify", "mobile notify phone")):
+        payload = text_after_any(text, ["phone notify", "mobile notify phone"]).strip()
+        lower_payload = payload.lower()
+        if " message " in lower_payload:
+            marker_index = lower_payload.index(" message ")
+            title = payload[:marker_index].strip() or "STAR"
+            body = payload[marker_index + len(" message "):].strip()
+        else:
+            title, body = "STAR", payload
+        if not body:
+            return "Tell me the phone notification message."
+        return queue_phone_action_reply("notify", {"title": title or "STAR", "body": body})
+
+    if lower_text.startswith(("phone open", "mobile open")):
+        target = text_after_any(text, ["phone open", "mobile open"]).strip()
+        if not target:
+            return "Tell me what URL or app link to open on phone."
+        return queue_phone_action_reply("open_url", {"url": target})
+
+    if lower_text.startswith(("phone share", "mobile share")):
+        payload = text_after_any(text, ["phone share", "mobile share"]).strip()
+        if not payload:
+            return "Tell me what text to share from phone."
+        return queue_phone_action_reply("share_text", {"text": payload})
+
+    if lower_text.startswith(("phone call", "mobile call")):
+        number = text_after_any(text, ["phone call", "mobile call"]).strip()
+        if not number:
+            return "Tell me the phone number to open in dialer."
+        return queue_phone_action_reply("call_intent", {"number": number})
+
+    if lower_text.startswith(("phone sms", "mobile sms", "phone message", "mobile message")):
+        payload = text_after_any(text, ["phone sms", "mobile sms", "phone message", "mobile message"]).strip()
+        lower_payload = payload.lower()
+        marker = " message "
+        if marker not in lower_payload:
+            return "Use: phone sms NUMBER message TEXT."
+        marker_index = lower_payload.index(marker)
+        number = payload[:marker_index].strip()
+        body = payload[marker_index + len(marker):].strip()
+        if not number or not body:
+            return "Use: phone sms NUMBER message TEXT."
+        return queue_phone_action_reply("sms_intent", {"number": number, "body": body})
+
+    return None
+
+
 def handle_integrations_command(command):
     text = command.strip()
     lower_text = text.lower()
 
     if lower_text in {"integration status", "integrations status", "cloud status", "mobile status", "smart home status"}:
         return star_integrations.format_status(star_integrations.integration_status())
+
+    phone_reply = parse_phone_action_command(text)
+    if phone_reply:
+        return phone_reply
 
     if lower_text in {"cloud sync", "cloud sync now", "sync cloud"}:
         result = star_integrations.cloud_sync_snapshot(BASE_DIR)
@@ -2394,6 +2472,10 @@ def detect_tool_without_ai(user_text):
         "integrations status",
         "cloud status",
         "mobile status",
+        "phone status",
+        "mobile bridge status",
+        "phone bridge status",
+        "android status",
         "smart home status",
         "cloud sync",
         "cloud sync now",
@@ -2402,6 +2484,25 @@ def detect_tool_without_ai(user_text):
         "show mobile notifications",
         "send mobile notification",
         "mobile notify",
+        "phone vibrate",
+        "mobile vibrate",
+        "vibrate phone",
+        "phone speak",
+        "mobile speak",
+        "phone bolo",
+        "mobile bolo",
+        "phone notify",
+        "mobile notify phone",
+        "phone open",
+        "mobile open",
+        "phone share",
+        "mobile share",
+        "phone call",
+        "mobile call",
+        "phone sms",
+        "mobile sms",
+        "phone message",
+        "mobile message",
         "smart home turn on",
         "smart home turn off",
         "add integration",
@@ -3526,6 +3627,60 @@ def mobile_status(secret: Optional[str] = None):
         "dashboard": "/dashboard",
         "mobile_app": "/mobile",
     }
+
+
+@app.post("/mobile/devices/register")
+def mobile_device_register(
+    device_id: str,
+    name: str = "STAR Phone",
+    platform: str = "android",
+    capabilities: str = "",
+    secret: Optional[str] = None,
+):
+    if not star_integrations.validate_mobile_secret(secret):
+        storage.add_log("warning", "mobile_auth_failed", {"endpoint": "device_register"})
+        return {"authorized": False, "error": "invalid_secret"}
+    device = star_integrations.register_mobile_device(device_id, name=name, platform=platform, capabilities=capabilities)
+    return {"authorized": True, "device": device}
+
+
+@app.get("/mobile/devices")
+def mobile_devices(secret: Optional[str] = None, limit: int = 50):
+    if not star_integrations.validate_mobile_secret(secret):
+        storage.add_log("warning", "mobile_auth_failed", {"endpoint": "devices"})
+        return {"authorized": False, "items": [], "error": "invalid_secret"}
+    return {"authorized": True, "items": star_integrations.list_mobile_devices(limit=limit)}
+
+
+@app.post("/mobile/actions")
+def mobile_action_create(action: str, payload: str = "", device_id: Optional[str] = None, secret: Optional[str] = None):
+    if not star_integrations.validate_mobile_secret(secret):
+        storage.add_log("warning", "mobile_auth_failed", {"endpoint": "action_create"})
+        return {"authorized": False, "error": "invalid_secret"}
+    action_id = star_integrations.queue_mobile_action(action, payload=payload, device_id=device_id)
+    return {"authorized": True, "status": "queued" if action_id else "ignored", "id": action_id}
+
+
+@app.get("/mobile/actions")
+def mobile_actions(status: str = "queued", limit: int = 50, secret: Optional[str] = None):
+    if not star_integrations.validate_mobile_secret(secret):
+        storage.add_log("warning", "mobile_auth_failed", {"endpoint": "actions"})
+        return {"authorized": False, "items": [], "error": "invalid_secret"}
+    return {"authorized": True, "items": star_integrations.list_mobile_actions(status=status, limit=limit)}
+
+
+@app.get("/mobile/actions/pull")
+def mobile_action_pull(device_id: str, secret: Optional[str] = None, limit: int = 5):
+    return star_integrations.mobile_action_pull(device_id=device_id, secret=secret, limit=limit)
+
+
+@app.post("/mobile/actions/{action_id}/complete")
+def mobile_action_complete(action_id: int, device_id: str, status: str = "done", result: str = "", secret: Optional[str] = None):
+    if not star_integrations.validate_mobile_secret(secret):
+        storage.add_log("warning", "mobile_auth_failed", {"endpoint": "action_complete"})
+        return {"authorized": False, "error": "invalid_secret"}
+    completed = star_integrations.complete_mobile_action(action_id, device_id=device_id, status=status, result=result)
+    return {"authorized": True, "status": "updated" if completed else "not_found", "id": action_id}
 
 
 @app.post("/mobile/command")

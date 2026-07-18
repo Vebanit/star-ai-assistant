@@ -164,6 +164,30 @@ def init_db():
                 read_at TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS mobile_devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                platform TEXT NOT NULL DEFAULT 'android',
+                capabilities_json TEXT,
+                status TEXT NOT NULL DEFAULT 'online',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mobile_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id TEXT,
+                action TEXT NOT NULL,
+                payload_json TEXT,
+                status TEXT NOT NULL DEFAULT 'queued',
+                result_json TEXT,
+                created_at TEXT NOT NULL,
+                claimed_at TEXT,
+                completed_at TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS automations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -208,6 +232,9 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_suggestion_feedback ON suggestion_feedback(suggestion_key, action);
             CREATE INDEX IF NOT EXISTS idx_integrations_kind ON integrations(kind, status);
             CREATE INDEX IF NOT EXISTS idx_mobile_notifications_status ON mobile_notifications(status, created_at);
+            CREATE INDEX IF NOT EXISTS idx_mobile_devices_seen ON mobile_devices(last_seen_at, status);
+            CREATE INDEX IF NOT EXISTS idx_mobile_actions_status ON mobile_actions(status, created_at);
+            CREATE INDEX IF NOT EXISTS idx_mobile_actions_device ON mobile_actions(device_id, status);
             CREATE INDEX IF NOT EXISTS idx_automations_due ON automations(next_run_at, status);
             CREATE INDEX IF NOT EXISTS idx_automation_runs_id ON automation_runs(automation_id);
             """
@@ -391,6 +418,8 @@ def get_stats():
         suggestion_feedback_count = conn.execute("SELECT COUNT(*) AS count FROM suggestion_feedback").fetchone()["count"]
         integration_count = conn.execute("SELECT COUNT(*) AS count FROM integrations").fetchone()["count"]
         mobile_notification_count = conn.execute("SELECT COUNT(*) AS count FROM mobile_notifications WHERE status = 'queued'").fetchone()["count"]
+        mobile_device_count = conn.execute("SELECT COUNT(*) AS count FROM mobile_devices").fetchone()["count"]
+        mobile_action_count = conn.execute("SELECT COUNT(*) AS count FROM mobile_actions WHERE status = 'queued'").fetchone()["count"]
         active_automation_count = conn.execute("SELECT COUNT(*) AS count FROM automations WHERE status = 'active'").fetchone()["count"]
 
     return {
@@ -409,6 +438,8 @@ def get_stats():
         "suggestion_feedback": suggestion_feedback_count,
         "integrations": integration_count,
         "mobile_notifications": mobile_notification_count,
+        "mobile_devices": mobile_device_count,
+        "mobile_actions": mobile_action_count,
         "active_automations": active_automation_count,
     }
 
