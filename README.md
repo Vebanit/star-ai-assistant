@@ -13,11 +13,12 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Web dashboard at `/dashboard` with chat, status, memory, tasks, reminders, voice settings, integrations, suggestions, logs, and command history.
 - Groq-powered assistant replies and action planning.
 - Edge TTS voice output.
+- Female Edge TTS voice by default, currently `en-US-JennyNeural`.
 - Persistent SQLite memory in `star.db`.
 - Conversation history, command history, and local logs.
 - Memory edit, recall, and forget commands.
 - App, website, and folder opening.
-- Process closing by fuzzy matching running process names.
+- Strong close commands for apps/browsers with English, Hinglish, and Hindi-style phrases like `close chrome`, `chrome band karo`, and `notepad bandh karo`.
 - Screenshot, click, scroll, and typing controls through PyAutoGUI.
 - System status for CPU, RAM, disk, battery, network, Windows info, processes, and installed apps.
 - Volume and brightness controls.
@@ -117,6 +118,11 @@ Voice behavior:
 ## Useful Commands
 
 - `open chrome`
+- `close chrome`
+- `chrome band karo`
+- `notepad bandh karo`
+- `close current tab`
+- `close current window`
 - `open downloads`
 - `search Python tutorials`
 - `take screenshot`

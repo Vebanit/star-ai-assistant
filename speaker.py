@@ -10,7 +10,7 @@ from playsound import playsound
 
 load_dotenv()
 
-VOICE = os.getenv("STAR_TTS_VOICE", "en-US-GuyNeural")
+VOICE = os.getenv("STAR_TTS_VOICE", "en-US-JennyNeural")
 RATE = os.getenv("STAR_TTS_RATE", "+5%")
 PITCH = os.getenv("STAR_TTS_PITCH", "+0Hz")
 

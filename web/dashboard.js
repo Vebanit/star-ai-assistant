@@ -247,7 +247,7 @@ function renderVoice(voice) {
   $("#voicePhraseLimit").value = settings.voice_phrase_time_limit || "6";
   $("#voicePause").value = settings.voice_pause_threshold || "0.8";
   $("#voiceEnergy").value = settings.voice_energy_threshold || "300";
-  $("#ttsVoice").value = settings.tts_voice || "en-US-GuyNeural";
+  $("#ttsVoice").value = settings.tts_voice || "en-US-JennyNeural";
   $("#ttsRate").value = settings.tts_rate || "+5%";
   $("#ttsPitch").value = settings.tts_pitch || "+0Hz";
   $("#spokenConfirmations").checked = checked(settings.voice_spoken_confirmations);

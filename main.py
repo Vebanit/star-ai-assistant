@@ -130,7 +130,7 @@ def speak(text):
     try:
         voice_settings = star_voice.get_settings()
         speaker_env = os.environ.copy()
-        speaker_env["STAR_TTS_VOICE"] = voice_settings.get("tts_voice", "en-US-GuyNeural")
+        speaker_env["STAR_TTS_VOICE"] = voice_settings.get("tts_voice", "en-US-JennyNeural")
         speaker_env["STAR_TTS_RATE"] = voice_settings.get("tts_rate", "+5%")
         speaker_env["STAR_TTS_PITCH"] = voice_settings.get("tts_pitch", "+0Hz")
         current_process = subprocess.Popen(
@@ -268,25 +268,82 @@ def scan_apps():
 
 APP_DATABASE = scan_apps()
 
+APP_ALIASES = {
+    "calculator": "calc",
+    "calc": "calc",
+    "notepad": "notepad",
+    "paint": "mspaint",
+    "vs code": "code",
+    "vscode": "code",
+    "chrome": "chrome",
+    "edge": "msedge",
+    "task manager": "taskmgr",
+    "control panel": "control",
+    "whatsapp": "whatsapp:",
+}
+
+CLOSE_TARGETS = {
+    "calculator": ["calculatorapp.exe", "calc.exe"],
+    "calc": ["calculatorapp.exe", "calc.exe"],
+    "notepad": ["notepad.exe"],
+    "paint": ["mspaint.exe", "paintstudio.view.exe"],
+    "vs code": ["code.exe"],
+    "vscode": ["code.exe"],
+    "chrome": ["chrome.exe"],
+    "google chrome": ["chrome.exe"],
+    "edge": ["msedge.exe"],
+    "microsoft edge": ["msedge.exe"],
+    "firefox": ["firefox.exe"],
+    "brave": ["brave.exe"],
+    "opera": ["opera.exe"],
+    "task manager": ["taskmgr.exe"],
+    "whatsapp": ["whatsapp.exe", "chrome.exe", "msedge.exe"],
+    "youtube": ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe"],
+    "google": ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe"],
+    "gmail": ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe"],
+    "github": ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe"],
+    "browser": ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe"],
+}
+
+CLOSE_VERBS = [
+    "close",
+    "exit",
+    "quit",
+    "kill",
+    "stop app",
+    "band karo",
+    "band kar",
+    "band",
+    "bandh karo",
+    "bandh kar",
+    "bandh",
+    "bnd karo",
+    "bnd kar",
+    "bnd",
+    "बंद करो",
+    "बंद कर",
+    "बंद",
+]
+
+PROTECTED_CLOSE_PROCESSES = {
+    "python.exe",
+    "pythonw.exe",
+    "uvicorn.exe",
+    "powershell.exe",
+    "pwsh.exe",
+    "cmd.exe",
+    "explorer.exe",
+    "winlogon.exe",
+    "csrss.exe",
+    "services.exe",
+    "lsass.exe",
+}
+
 
 def open_anything(command):
     cmd = command.lower().replace("open ", "", 1).strip()
 
-    aliases = {
-        "calculator": "calc",
-        "calc": "calc",
-        "notepad": "notepad",
-        "paint": "mspaint",
-        "vs code": "code",
-        "vscode": "code",
-        "chrome": "chrome",
-        "edge": "msedge",
-        "task manager": "taskmgr",
-        "control panel": "control",
-        "whatsapp": "whatsapp:",
-    }
-
-    for key, target in aliases.items():
+    for key, target in APP_ALIASES.items():
         if key in cmd:
             speak(f"Opening {key}")
             subprocess.Popen(f'start "" {target}', shell=True)
@@ -333,18 +390,101 @@ def open_anything(command):
         return False
 
 
-def close_anything(command):
-    cmd = command.lower().replace("close ", "", 1).strip()
-    processes = [p.info["name"] for p in psutil.process_iter(["name"]) if p.info.get("name")]
-    match = difflib.get_close_matches(cmd, processes, n=1, cutoff=0.5)
+def close_target_from_command(command):
+    text = str(command).lower().strip()
+    for verb in CLOSE_VERBS:
+        text = text.replace(verb, " ")
+    text = " ".join(text.split()).strip()
+    fillers = ["application", "window", "please", "krdo", "kardo", "kar do", "kar de"]
+    for filler in fillers:
+        text = text.replace(filler, " ")
+    return " ".join(text.split()).strip()
 
+
+def close_active_window(command):
+    text = str(command).lower()
+    if any(phrase in text for phrase in ["current tab", "close tab", "tab band", "tab bandh"]):
+        pyautogui.hotkey("ctrl", "w")
+        speak("Closing current tab")
+        return True
+    if any(phrase in text for phrase in ["current window", "active window", "close window", "window band", "window bandh"]):
+        pyautogui.hotkey("alt", "f4")
+        speak("Closing current window")
+        return True
+    return False
+
+
+def find_processes_for_target(target):
+    clean_target = target.lower().replace(".exe", "").strip()
+    wanted_names = []
+    for key, names in CLOSE_TARGETS.items():
+        if key in clean_target or clean_target in key:
+            wanted_names.extend(names)
+
+    matches = []
+    process_rows = []
+    for proc in psutil.process_iter(["pid", "name"]):
+        try:
+            name = proc.info.get("name") or ""
+            lower_name = name.lower()
+            if not lower_name or lower_name in PROTECTED_CLOSE_PROCESSES:
+                continue
+            process_rows.append((proc, lower_name))
+            if lower_name in wanted_names:
+                matches.append(proc)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    if matches:
+        return matches
+
+    for proc, lower_name in process_rows:
+        base_name = lower_name.replace(".exe", "")
+        if clean_target and (clean_target == base_name or clean_target in base_name or base_name in clean_target):
+            matches.append(proc)
+
+    if matches:
+        return matches
+
+    names = sorted({name for _, name in process_rows})
+    match = difflib.get_close_matches(clean_target, names, n=1, cutoff=0.62)
     if not match:
+        return []
+    return [proc for proc, lower_name in process_rows if lower_name == match[0]]
+
+
+def close_anything(command):
+    if close_active_window(command):
+        return True
+
+    target = close_target_from_command(command)
+    if not target:
         return False
 
-    proc = match[0]
-    speak(f"Closing {proc}")
-    subprocess.run(["taskkill", "/IM", proc, "/F"], capture_output=True, text=True)
-    return True
+    matches = find_processes_for_target(target)
+    if not matches:
+        return False
+
+    closed = 0
+    for proc in matches:
+        try:
+            proc.terminate()
+            closed += 1
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    gone, alive = psutil.wait_procs(matches, timeout=2)
+    for proc in alive:
+        try:
+            proc.kill()
+            closed += 1
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    if closed:
+        speak(f"Closing {target}")
+        return True
+    return False
 
 
 def take_screenshot():

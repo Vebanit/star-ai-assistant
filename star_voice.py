@@ -14,7 +14,7 @@ DEFAULT_SETTINGS = {
     "voice_spoken_confirmations": "true",
     "wake_engine": "auto",
     "wake_phrases": "hello star,hey star,star,sitar,sitara",
-    "tts_voice": "en-US-GuyNeural",
+    "tts_voice": "en-US-JennyNeural",
     "tts_rate": "+5%",
     "tts_pitch": "+0Hz",
 }
