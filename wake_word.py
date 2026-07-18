@@ -16,7 +16,7 @@ WAKE_WORD_FILE = "Hello-STAR_en_windows_v4_0_0.ppn"
 load_dotenv()
 
 recognizer = sr.Recognizer()
-recognizer.non_speaking_duration = 0.5
+recognizer.non_speaking_duration = 0.25
 recognizer.dynamic_energy_threshold = True
 conversation_mode = False
 
@@ -25,6 +25,7 @@ def apply_voice_settings(settings=None):
     settings = settings or star_voice.get_settings()
     recognizer.pause_threshold = float(settings.get("voice_pause_threshold", "0.8"))
     recognizer.energy_threshold = int(float(settings.get("voice_energy_threshold", "300")))
+    recognizer.non_speaking_duration = min(0.25, recognizer.pause_threshold)
     return settings
 
 
@@ -119,7 +120,7 @@ def listen_continuous():
         settings = apply_voice_settings()
         with sr.Microphone() as source:
             print("Listening Bajrangi...")
-            recognizer.adjust_for_ambient_noise(source, duration=0.3)
+            recognizer.adjust_for_ambient_noise(source, duration=0.12)
 
             try:
                 audio = recognizer.listen(
@@ -143,7 +144,7 @@ def listen_for_speech_wake():
     while True:
         settings = apply_voice_settings()
         with sr.Microphone() as source:
-            recognizer.adjust_for_ambient_noise(source, duration=0.2)
+            recognizer.adjust_for_ambient_noise(source, duration=0.1)
             try:
                 audio = recognizer.listen(source, timeout=5, phrase_time_limit=4)
             except sr.WaitTimeoutError:

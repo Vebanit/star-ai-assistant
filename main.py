@@ -70,6 +70,7 @@ PENDING_CONFIRMATION = None
 PENDING_MEDIA_REQUEST = None
 SPEECH_CONTEXT = None
 ADAPTED_REPLY_CACHE = {}
+SPEAKING_SIGNAL_UNTIL = 0
 SUPPRESS_TTS = contextvars.ContextVar("SUPPRESS_TTS", default=False)
 
 
@@ -141,7 +142,7 @@ def adapt_reply_for_context(reply, user_text=None):
 
 
 def speak(text):
-    global current_process
+    global current_process, SPEAKING_SIGNAL_UNTIL
 
     if not text:
         return False
@@ -158,6 +159,8 @@ def speak(text):
         current_process.terminate()
 
     try:
+        duration_hint = max(2.5, min(10.0, len(str(text)) * 0.055))
+        SPEAKING_SIGNAL_UNTIL = time.time() + duration_hint
         voice_settings = star_voice.get_settings()
         speaker_env = os.environ.copy()
         speaker_env["STAR_TTS_VOICE"] = voice_settings.get("tts_voice", "en-US-JennyNeural")
@@ -175,7 +178,8 @@ def speak(text):
 
 
 def stop_speaking():
-    global current_process
+    global current_process, SPEAKING_SIGNAL_UNTIL
+    SPEAKING_SIGNAL_UNTIL = 0
 
     if current_process and current_process.poll() is None:
         current_process.terminate()
@@ -183,6 +187,10 @@ def stop_speaking():
         return True
 
     return False
+
+
+def is_speaking():
+    return bool((current_process and current_process.poll() is None) or time.time() < SPEAKING_SIGNAL_UNTIL)
 
 
 # ------------------- BROWSER AUTOMATION -------------------
@@ -2831,12 +2839,81 @@ def detect_tool_without_ai(user_text):
     return None
 
 
+def should_use_ai_planner(user_text):
+    text = star_voice.normalize_text(user_text)
+    if not text:
+        return False
+
+    question_starts = (
+        "what ",
+        "why ",
+        "how ",
+        "who ",
+        "where ",
+        "when ",
+        "kya ",
+        "kyu ",
+        "kaise ",
+        "kon ",
+        "kaha ",
+        "kab ",
+        "tell me ",
+        "explain ",
+        "bata ",
+        "samjha ",
+    )
+    if text.startswith(question_starts):
+        return False
+
+    action_markers = [
+        "open",
+        "close",
+        "play",
+        "pause",
+        "send",
+        "create",
+        "add",
+        "delete",
+        "remove",
+        "schedule",
+        "remind",
+        "call",
+        "message",
+        "email",
+        "search",
+        "find",
+        "read",
+        "summarize",
+        "analyze",
+        "check",
+        "run",
+        "start",
+        "stop",
+        "set",
+        "turn",
+        "karo",
+        "kar",
+        "kholo",
+        "khol",
+        "band",
+        "bandh",
+        "chala",
+        "chalao",
+        "bhejo",
+        "padho",
+        "dikha",
+        "lagao",
+        "baja",
+    ]
+    return any(marker in text for marker in action_markers)
+
+
 def agent_brain(user_text):
     direct_tool = detect_tool_without_ai(user_text)
     if direct_tool:
         return direct_tool
 
-    if not client:
+    if not client or not should_use_ai_planner(user_text):
         return "none"
 
     prompt = f"""
@@ -3289,10 +3366,7 @@ User: {text}
         first_sentence = reply.split(".")[0].strip()
         final_reply = f"{first_sentence}." if first_sentence else reply
 
-        for sentence in reply.split("."):
-            sentence = sentence.strip()
-            if sentence:
-                speak(sentence)
+        speak(final_reply)
 
         return record_interaction(text, "none", "ok", final_reply)
     finally:
@@ -3387,6 +3461,7 @@ def voice_status():
         "settings": star_voice.get_settings(),
         "recognition_languages": star_voice.recognition_languages(),
         "last": star_voice.last_voice_state(),
+        "is_speaking": is_speaking(),
         "pending_confirmation": PENDING_CONFIRMATION["description"] if PENDING_CONFIRMATION else None,
     }
 
