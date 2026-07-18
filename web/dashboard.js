@@ -287,7 +287,18 @@ function phonePayloadForAction(action, value) {
   if (action === "notify") return { title: "STAR", body: textValue || "Phone bridge test" };
   if (action === "open_url") return { url: textValue || "https://google.com" };
   if (action === "share_text") return { text: textValue || "Shared from STAR" };
+  if (action === "toast") return { text: textValue || "STAR phone toast" };
+  if (action === "torch_on") return { state: "on" };
+  if (action === "torch_off") return { state: "off" };
+  if (action === "clipboard_set") return { text: textValue || "Copied from STAR" };
+  if (action === "location") return { provider: "network" };
+  if (action === "battery" || action === "clipboard_get" || action === "wifi_connection") return {};
   return { duration_ms: 700 };
+}
+
+function phoneBackendAction(action) {
+  if (action === "torch_on" || action === "torch_off") return "torch";
+  return action;
 }
 
 function renderPhoneBridge(pairing, devices, actions) {
@@ -636,8 +647,9 @@ function bindEvents() {
 
   $("#phoneActionForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const action = $("#phoneActionType").value;
-    const payload = JSON.stringify(phonePayloadForAction(action, $("#phoneActionPayload").value));
+    const uiAction = $("#phoneActionType").value;
+    const action = phoneBackendAction(uiAction);
+    const payload = JSON.stringify(phonePayloadForAction(uiAction, $("#phoneActionPayload").value));
     await api(`/mobile/actions?action=${encodeURIComponent(action)}&payload=${encodeURIComponent(payload)}`, { method: "POST" });
     $("#phoneActionPayload").value = "";
     await refreshAll();

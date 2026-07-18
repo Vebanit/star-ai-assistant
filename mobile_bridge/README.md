@@ -54,6 +54,14 @@ export MOBILE_SHARED_SECRET="same_secret_here"
 - `phone status`
 - `phone vibrate`
 - `phone speak hello bhai`
+- `phone toast done bhai`
+- `phone battery`
+- `phone location`
+- `phone wifi`
+- `phone torch on`
+- `phone torch off`
+- `phone clipboard set hello`
+- `phone clipboard read`
 - `phone notify STAR message Check your tasks`
 - `phone open https://youtube.com`
 - `phone share hello from STAR`

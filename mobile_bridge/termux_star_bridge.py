@@ -25,6 +25,12 @@ CAPABILITIES = [
     "call_intent",
     "sms_intent",
     "battery",
+    "toast",
+    "torch",
+    "clipboard_set",
+    "clipboard_get",
+    "location",
+    "wifi_connection",
 ]
 
 
@@ -116,6 +122,33 @@ def execute_action(action):
 
     if kind == "battery":
         return run_command(["termux-battery-status"])
+
+    if kind == "toast":
+        text = str(payload.get("text") or "STAR")
+        return run_command(["termux-toast", text])
+
+    if kind == "torch":
+        state = str(payload.get("state") or "on").lower()
+        state = "on" if state in {"on", "true", "1", "yes"} else "off"
+        return run_command(["termux-torch", state])
+
+    if kind == "clipboard_set":
+        text = str(payload.get("text") or "")
+        if not text:
+            return {"status": "error", "message": "missing text"}
+        return run_command(["termux-clipboard-set", text])
+
+    if kind == "clipboard_get":
+        return run_command(["termux-clipboard-get"])
+
+    if kind == "location":
+        provider = str(payload.get("provider") or "network").lower()
+        if provider not in {"gps", "network", "passive"}:
+            provider = "network"
+        return run_command(["termux-location", "-p", provider], timeout=45)
+
+    if kind == "wifi_connection":
+        return run_command(["termux-wifi-connectioninfo"])
 
     return {"status": "skipped", "message": f"unknown action {kind}"}
 

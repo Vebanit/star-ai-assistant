@@ -1605,11 +1605,40 @@ def parse_phone_action_command(command):
     if lower_text in {"phone vibrate", "mobile vibrate", "vibrate phone"}:
         return queue_phone_action_reply("vibrate", {"duration_ms": 700})
 
+    if lower_text in {"phone battery", "mobile battery", "phone battery status", "mobile battery status"}:
+        return queue_phone_action_reply("battery")
+
+    if lower_text in {"phone location", "mobile location", "phone where are you", "mobile where are you"}:
+        return queue_phone_action_reply("location", {"provider": "network"})
+
+    if lower_text in {"phone wifi", "mobile wifi", "phone wifi status", "mobile wifi status"}:
+        return queue_phone_action_reply("wifi_connection")
+
+    if lower_text in {"phone torch on", "mobile torch on", "phone flashlight on", "mobile flashlight on"}:
+        return queue_phone_action_reply("torch", {"state": "on"})
+
+    if lower_text in {"phone torch off", "mobile torch off", "phone flashlight off", "mobile flashlight off"}:
+        return queue_phone_action_reply("torch", {"state": "off"})
+
     if lower_text.startswith(("phone speak", "mobile speak", "phone bolo", "mobile bolo")):
         payload = text_after_any(text, ["phone speak", "mobile speak", "phone bolo", "mobile bolo"]).strip()
         if not payload:
             return "Tell me what the phone should say."
         return queue_phone_action_reply("speak", {"text": payload})
+
+    if lower_text.startswith(("phone toast", "mobile toast")):
+        payload = text_after_any(text, ["phone toast", "mobile toast"]).strip()
+        if not payload:
+            return "Tell me what toast message to show on phone."
+        return queue_phone_action_reply("toast", {"text": payload})
+
+    if lower_text.startswith(("phone clipboard", "mobile clipboard", "phone copy", "mobile copy")):
+        if lower_text in {"phone clipboard", "mobile clipboard", "phone clipboard read", "mobile clipboard read", "phone read clipboard", "mobile read clipboard"}:
+            return queue_phone_action_reply("clipboard_get")
+        payload = text_after_any(text, ["phone clipboard set", "mobile clipboard set", "phone clipboard", "mobile clipboard", "phone copy", "mobile copy"]).strip()
+        if not payload:
+            return "Tell me what text to copy to phone clipboard."
+        return queue_phone_action_reply("clipboard_set", {"text": payload})
 
     if lower_text.startswith(("phone notify", "mobile notify phone")):
         payload = text_after_any(text, ["phone notify", "mobile notify phone"]).strip()
@@ -2537,10 +2566,36 @@ def detect_tool_without_ai(user_text):
         "phone vibrate",
         "mobile vibrate",
         "vibrate phone",
+        "phone battery",
+        "mobile battery",
+        "phone battery status",
+        "mobile battery status",
+        "phone location",
+        "mobile location",
+        "phone where are you",
+        "mobile where are you",
+        "phone wifi",
+        "mobile wifi",
+        "phone wifi status",
+        "mobile wifi status",
+        "phone torch on",
+        "mobile torch on",
+        "phone flashlight on",
+        "mobile flashlight on",
+        "phone torch off",
+        "mobile torch off",
+        "phone flashlight off",
+        "mobile flashlight off",
         "phone speak",
         "mobile speak",
         "phone bolo",
         "mobile bolo",
+        "phone toast",
+        "mobile toast",
+        "phone clipboard",
+        "mobile clipboard",
+        "phone copy",
+        "mobile copy",
         "phone notify",
         "mobile notify phone",
         "phone open",

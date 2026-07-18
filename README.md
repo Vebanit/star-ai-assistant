@@ -43,7 +43,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - WhatsApp persistent Chrome profile, login status checks, and better Selenium waits for WhatsApp Web.
 - Email IMAP/SMTP connection diagnostics, timeout settings, and retry handling.
 - Mobile companion at `/mobile` with wake listening, command sending, mobile speech replies, notifications, and optional shared-secret auth.
-- Android Termux bridge for phone-side actions such as speak, vibrate, notifications, URL/deep-link intents, share, call intent, and SMS intent.
+- Android Termux bridge for phone-side actions such as speak, vibrate, notifications, URL/deep-link intents, share, call/SMS intent, battery, torch, clipboard, location, and Wi-Fi info.
 - Smart-home validation and retry handling for Home Assistant service calls.
 - Coding helper for project analysis, code search, explain/review file, and Python compile checks.
 - Git helper for status, log, diff, branch, remotes, and confirmed commit/pull/push.
