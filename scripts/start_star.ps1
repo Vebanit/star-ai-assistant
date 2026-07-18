@@ -85,7 +85,7 @@ if (Test-RunningPid $WakePidFile) {
 } else {
     $wake = Start-Process `
         -FilePath $Python `
-        -ArgumentList @("wake_word.py") `
+        -ArgumentList @("-u", "wake_word.py") `
         -WorkingDirectory $ProjectRoot `
         -WindowStyle Hidden `
         -RedirectStandardOutput $WakeLog `

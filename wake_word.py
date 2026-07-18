@@ -1,5 +1,6 @@
 import os
 import struct
+import sys
 import time
 from pathlib import Path
 
@@ -12,8 +13,14 @@ import star_voice
 
 BASE_URL = "http://127.0.0.1:8000"
 WAKE_WORD_FILE = "Hello-STAR_en_windows_v4_0_0.ppn"
+WAKE_REPLY_SETTLE_SECONDS = 1.4
 
 load_dotenv()
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except AttributeError:
+    pass
 
 recognizer = sr.Recognizer()
 recognizer.non_speaking_duration = 0.25
@@ -34,7 +41,7 @@ def call_star(path, params=None, method="get"):
         request = requests.post if method == "post" else requests.get
         return request(f"{BASE_URL}{path}", params=params, timeout=20)
     except requests.RequestException as exc:
-        print("STAR backend request failed:", exc)
+        print("STAR backend request failed:", exc, flush=True)
         return None
 
 
@@ -49,9 +56,9 @@ def recognize_with_fallback(audio, settings, strip_wake=True):
         except sr.UnknownValueError:
             errors.append(language)
         except Exception as exc:
-            print(f"Speech recognition error for {language}:", exc)
+            print(f"Speech recognition error for {language}:", exc, flush=True)
             errors.append(language)
-    print("Not understood with languages:", ", ".join(errors))
+    print("Not understood with languages:", ", ".join(errors), flush=True)
     return "", None
 
 
@@ -63,44 +70,44 @@ def handle_spoken_command(command, used_language=None):
         return
 
     language = f" ({used_language})" if used_language else ""
-    print(f"You said{language}:", command)
+    print(f"You said{language}:", command, flush=True)
 
     settings = star_voice.get_settings()
     if star_voice.is_voice_quiet(settings):
         if star_voice.is_resume_command(command):
-            print("Resuming STAR voice conversation.")
+            print("Resuming STAR voice conversation.", flush=True)
             call_star("/voice/resume", method="post")
             conversation_mode = True
             return
-        print("STAR is quiet. Ignoring command until resume phrase.")
+        print("STAR is quiet. Ignoring command until resume phrase.", flush=True)
         conversation_mode = False
         return
 
     if star_voice.is_exit_listening_command(command):
-        print("Entering wake-only sleep mode.")
+        print("Entering wake-only sleep mode.", flush=True)
         call_star("/voice/sleep", method="post")
         conversation_mode = False
         return
 
     if star_voice.is_quiet_command(command):
-        print("Putting STAR in quiet mode.")
+        print("Putting STAR in quiet mode.", flush=True)
         call_star("/voice/quiet", method="post")
         conversation_mode = False
         return
 
     if star_voice.is_stop_speaking_command(command):
-        print("Stopping speech...")
+        print("Stopping speech...", flush=True)
         call_star("/stop")
         return
 
     if star_voice.is_repeat_command(command):
-        print("Repeating last reply...")
+        print("Repeating last reply...", flush=True)
         call_star("/voice/repeat", method="post")
         return
 
     confirmation = star_voice.confirmation_intent(command)
     if confirmation:
-        print("Confirmation intent:", confirmation)
+        print("Confirmation intent:", confirmation, flush=True)
         call_star("/ask-star", params={"q": confirmation})
         return
 
@@ -119,7 +126,7 @@ def listen_continuous():
     while conversation_mode:
         settings = apply_voice_settings()
         with sr.Microphone() as source:
-            print("Listening Bajrangi...")
+            print("Listening Bajrangi...", flush=True)
             recognizer.adjust_for_ambient_noise(source, duration=0.12)
 
             try:
@@ -138,8 +145,8 @@ def listen_continuous():
 def listen_for_speech_wake():
     global conversation_mode
 
-    print("STAR is listening in free keyless wake mode...")
-    print("Say: hello star, hey star, or star.")
+    print("STAR is listening in free keyless wake mode...", flush=True)
+    print("Say: hello star, hey star, or star.", flush=True)
 
     while True:
         settings = apply_voice_settings()
@@ -158,13 +165,16 @@ def listen_for_speech_wake():
         if not phrase:
             continue
 
-        print(f"Wake phrase detected: {phrase}")
+        print(f"Wake phrase detected: {phrase}", flush=True)
         immediate_command = star_voice.command_after_wake(transcript, settings=settings)
         conversation_mode = True
         if immediate_command:
             handle_spoken_command(immediate_command, used_language)
         else:
-            call_star("/voice/wake", method="post")
+            response = call_star("/voice/wake", method="post")
+            if response is not None:
+                print("Wake acknowledgement sent.", flush=True)
+            time.sleep(WAKE_REPLY_SETTLE_SECONDS)
         listen_continuous()
 
 
@@ -199,19 +209,19 @@ def listen_for_picovoice_wake():
 
     try:
         stream = open_stream()
-        print("STAR is listening with Picovoice wake word...")
+        print("STAR is listening with Picovoice wake word...", flush=True)
         while True:
             pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
             pcm = struct.unpack_from("h" * porcupine.frame_length, pcm)
 
             keyword_index = porcupine.process(pcm)
             if keyword_index >= 0:
-                print("Wake word detected!")
+                print("Wake word detected!", flush=True)
                 conversation_mode = True
                 stream.stop_stream()
                 stream.close()
                 stream = None
-                time.sleep(0.3)
+                time.sleep(WAKE_REPLY_SETTLE_SECONDS)
                 listen_continuous()
                 stream = open_stream()
     finally:
@@ -230,10 +240,10 @@ def main():
             listen_for_picovoice_wake()
             return
         except Exception as exc:
-            print("Picovoice wake failed:", exc)
+            print("Picovoice wake failed:", exc, flush=True)
             if engine == "picovoice":
                 raise
-            print("Falling back to free keyless speech wake mode.")
+            print("Falling back to free keyless speech wake mode.", flush=True)
 
     listen_for_speech_wake()
 

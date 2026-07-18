@@ -15,7 +15,7 @@ DEFAULT_SETTINGS = {
     "voice_spoken_confirmations": "true",
     "voice_quiet": "false",
     "wake_engine": "auto",
-    "wake_phrases": "hello,hello star,hey star,ok star,okay star,chal star,star,sitar,sitara,ok sar,ok sir",
+    "wake_phrases": "hello star,hello,hey star,ok star,okay star,chal star,star,sitar,sitara,hello sir,hello sar,yellow star,halo star,helo star,ok sar,ok sir",
     "tts_voice": "en-US-JennyNeural",
     "tts_rate": "+5%",
     "tts_pitch": "+0Hz",
@@ -282,11 +282,28 @@ def normalize_text(text):
 def wake_phrases(settings=None):
     settings = settings or get_settings()
     phrases = str(settings.get("wake_phrases") or DEFAULT_SETTINGS["wake_phrases"])
-    return [normalize_text(item) for item in phrases.split(",") if normalize_text(item)]
+    clean_phrases = [normalize_text(item) for item in phrases.split(",") if normalize_text(item)]
+    return sorted(clean_phrases, key=len, reverse=True)
+
+
+def canonical_wake_text(text):
+    clean = normalize_text(text)
+    wake_aliases = {
+        "yellow star": "hello star",
+        "halo star": "hello star",
+        "helo star": "hello star",
+        "hello sir": "hello star",
+        "hello sar": "hello star",
+        "ok sir": "ok star",
+        "ok sar": "ok star",
+    }
+    for wrong, right in wake_aliases.items():
+        clean = re.sub(rf"\b{re.escape(wrong)}\b", right, clean)
+    return clean
 
 
 def detect_wake_phrase(text, settings=None):
-    clean = normalize_text(text)
+    clean = canonical_wake_text(text)
     for phrase in wake_phrases(settings):
         if clean == phrase or clean.startswith(phrase + " "):
             return phrase
@@ -294,7 +311,7 @@ def detect_wake_phrase(text, settings=None):
 
 
 def command_after_wake(text, settings=None):
-    clean = normalize_text(text)
+    clean = canonical_wake_text(text)
     phrase = detect_wake_phrase(clean, settings=settings)
     if not phrase:
         return ""
@@ -306,11 +323,16 @@ def clean_transcript(text):
     clean = clean.replace("’", "'").replace("`", "'")
 
     wake_prefixes = [
-        "hello",
         "hello star",
         "hey star",
         "ok star",
         "okay star",
+        "hello sir",
+        "hello sar",
+        "yellow star",
+        "halo star",
+        "helo star",
+        "hello",
         "star",
         "sitar",
         "sitara",
