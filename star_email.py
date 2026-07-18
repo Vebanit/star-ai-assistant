@@ -2,15 +2,24 @@ import email
 import imaplib
 import os
 import smtplib
+import time
 from email.header import decode_header
 from email.message import EmailMessage
-from email.utils import parsedate_to_datetime
+from email.utils import parseaddr, parsedate_to_datetime
 
 
 DEFAULT_IMAP_HOST = "imap.gmail.com"
 DEFAULT_IMAP_PORT = 993
 DEFAULT_SMTP_HOST = "smtp.gmail.com"
 DEFAULT_SMTP_PORT = 587
+DEFAULT_TIMEOUT = 12
+RETRYABLE_ERRORS = (
+    TimeoutError,
+    OSError,
+    imaplib.IMAP4.abort,
+    smtplib.SMTPServerDisconnected,
+    smtplib.SMTPConnectError,
+)
 
 
 def config():
@@ -21,6 +30,7 @@ def config():
         "imap_port": int(os.getenv("EMAIL_IMAP_PORT", DEFAULT_IMAP_PORT)),
         "smtp_host": os.getenv("EMAIL_SMTP_HOST", DEFAULT_SMTP_HOST),
         "smtp_port": int(os.getenv("EMAIL_SMTP_PORT", DEFAULT_SMTP_PORT)),
+        "timeout": int(os.getenv("EMAIL_TIMEOUT_SECONDS", DEFAULT_TIMEOUT)),
     }
 
 
@@ -36,7 +46,10 @@ def status():
         "address_configured": bool(cfg["address"]),
         "password_configured": bool(cfg["password"]),
         "imap_host": cfg["imap_host"],
+        "imap_port": cfg["imap_port"],
         "smtp_host": cfg["smtp_host"],
+        "smtp_port": cfg["smtp_port"],
+        "timeout": cfg["timeout"],
     }
 
 
@@ -49,7 +62,7 @@ def require_config():
 
 def imap_connect(mailbox="INBOX"):
     cfg = require_config()
-    client = imaplib.IMAP4_SSL(cfg["imap_host"], cfg["imap_port"])
+    client = imaplib.IMAP4_SSL(cfg["imap_host"], cfg["imap_port"], timeout=cfg["timeout"])
     client.login(cfg["address"], cfg["password"])
     client.select(mailbox)
     return client
@@ -57,14 +70,51 @@ def imap_connect(mailbox="INBOX"):
 
 def smtp_connect():
     cfg = require_config()
-    client = smtplib.SMTP(cfg["smtp_host"], cfg["smtp_port"])
+    client = smtplib.SMTP(cfg["smtp_host"], cfg["smtp_port"], timeout=cfg["timeout"])
     client.starttls()
     client.login(cfg["address"], cfg["password"])
     return client
 
 
+def with_retry(callback, attempts=2):
+    last_error = None
+    for attempt in range(max(1, attempts)):
+        try:
+            return callback()
+        except RETRYABLE_ERRORS as exc:
+            last_error = exc
+            if attempt + 1 >= attempts:
+                break
+            time.sleep(1)
+    raise last_error
+
+
+def test_connection():
+    if not is_configured():
+        return {"configured": False, "imap": "missing_config", "smtp": "missing_config"}
+
+    result = {"configured": True, "imap": "unknown", "smtp": "unknown"}
+    try:
+        client = with_retry(lambda: imap_connect())
+        safe_logout(client)
+        result["imap"] = "ok"
+    except Exception as exc:
+        result["imap"] = "error"
+        result["imap_error"] = str(exc)[:300]
+
+    try:
+        client = with_retry(smtp_connect)
+        client.quit()
+        result["smtp"] = "ok"
+    except Exception as exc:
+        result["smtp"] = "error"
+        result["smtp_error"] = str(exc)[:300]
+
+    return result
+
+
 def list_emails(limit=10, mailbox="INBOX", unread_only=False):
-    client = imap_connect(mailbox)
+    client = with_retry(lambda: imap_connect(mailbox))
     try:
         criterion = "UNSEEN" if unread_only else "ALL"
         status_code, data = client.search(None, criterion)
@@ -83,7 +133,7 @@ def list_emails(limit=10, mailbox="INBOX", unread_only=False):
 
 
 def search_emails(query, limit=10, mailbox="INBOX"):
-    client = imap_connect(mailbox)
+    client = with_retry(lambda: imap_connect(mailbox))
     try:
         safe_query = str(query).replace('"', "")
         status_code, data = client.search(None, "TEXT", f'"{safe_query}"')
@@ -155,23 +205,26 @@ def decode_header_value(value):
 
 def send_email(to, subject, body):
     cfg = require_config()
+    _, address = parseaddr(str(to))
+    if "@" not in address:
+        raise ValueError("Email address is invalid.")
     message = EmailMessage()
     message["From"] = cfg["address"]
-    message["To"] = to
+    message["To"] = address
     message["Subject"] = subject
     message.set_content(body)
 
-    client = smtp_connect()
+    client = with_retry(smtp_connect)
     try:
         client.send_message(message)
     finally:
         client.quit()
 
-    return {"status": "sent", "to": to, "subject": subject}
+    return {"status": "sent", "to": address, "subject": subject}
 
 
 def archive_email(message_id, mailbox="INBOX"):
-    client = imap_connect(mailbox)
+    client = with_retry(lambda: imap_connect(mailbox))
     try:
         client.store(str(message_id), "+FLAGS", "\\Seen")
         try:
@@ -186,7 +239,7 @@ def archive_email(message_id, mailbox="INBOX"):
 
 
 def delete_email(message_id, mailbox="INBOX"):
-    client = imap_connect(mailbox)
+    client = with_retry(lambda: imap_connect(mailbox))
     try:
         client.store(str(message_id), "+FLAGS", "\\Deleted")
         client.expunge()

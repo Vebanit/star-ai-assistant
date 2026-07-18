@@ -35,6 +35,10 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Browser tab controls, Google/DuckDuckGo search, and file download helper.
 - Media controls for play/pause, next/previous, YouTube, Spotify, Netflix, and VLC.
 - WhatsApp chat search/send helpers through WhatsApp Web.
+- WhatsApp persistent Chrome profile, login status checks, and better Selenium waits for WhatsApp Web.
+- Email IMAP/SMTP connection diagnostics, timeout settings, and retry handling.
+- Mobile pull endpoint with optional shared-secret auth for queued notifications.
+- Smart-home validation and retry handling for Home Assistant service calls.
 - Coding helper for project analysis, code search, explain/review file, and Python compile checks.
 - Git helper for status, log, diff, branch, remotes, and confirmed commit/pull/push.
 - Smart automation for scheduled commands, simple workflows, due runs, and automation history.
@@ -166,6 +170,8 @@ python wake_word.py
 - `smart suggestions`
 - `dismiss suggestion log_water`
 - `integration status`
+- `email test`
+- `whatsapp status`
 - `cloud sync now`
 - `send mobile notification STAR message Check your tasks`
 - `mobile notifications`

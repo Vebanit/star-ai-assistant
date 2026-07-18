@@ -1,10 +1,37 @@
 import json
 import os
+import time
 from pathlib import Path
 
 import requests
 
 import star_storage as storage
+
+REQUEST_TIMEOUT = int(os.getenv("INTEGRATION_TIMEOUT_SECONDS", "10"))
+ALLOWED_HOME_ASSISTANT_SERVICES = {
+    "turn_on",
+    "turn_off",
+    "toggle",
+    "open_cover",
+    "close_cover",
+    "set_temperature",
+    "lock",
+    "unlock",
+}
+
+
+def request_with_retry(method, url, attempts=2, **kwargs):
+    last_error = None
+    timeout = kwargs.pop("timeout", REQUEST_TIMEOUT)
+    for attempt in range(max(1, attempts)):
+        try:
+            return requests.request(method, url, timeout=timeout, **kwargs)
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt + 1 >= attempts:
+                break
+            time.sleep(1)
+    raise last_error
 
 
 def integration_status():
@@ -16,6 +43,7 @@ def integration_status():
         "mobile": {
             "configured": bool(os.getenv("MOBILE_SHARED_SECRET")),
             "queued_notifications": len(list_mobile_notifications(status="queued", limit=100)),
+            "auth": "shared_secret" if os.getenv("MOBILE_SHARED_SECRET") else "local_open",
         },
         "smart_home": {
             "configured": bool(os.getenv("HOME_ASSISTANT_URL") and os.getenv("HOME_ASSISTANT_TOKEN")),
@@ -79,7 +107,9 @@ def cloud_sync_snapshot(base_dir):
         },
     }
     path = sync_dir / "star_snapshot.json"
-    path.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8")
+    temp_path = path.with_suffix(".tmp")
+    temp_path.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8")
+    temp_path.replace(path)
     storage.add_log("info", "cloud_snapshot_written", {"path": str(path)})
     return {"status": "synced", "path": str(path), "stats": stats}
 
@@ -99,6 +129,26 @@ def queue_mobile_notification(title, body):
         )
     storage.add_log("info", "mobile_notification_queued", {"id": cur.lastrowid})
     return cur.lastrowid
+
+
+def validate_mobile_secret(secret=None):
+    expected = os.getenv("MOBILE_SHARED_SECRET")
+    if not expected:
+        return True
+    return str(secret or "") == expected
+
+
+def mobile_pull(secret=None, limit=20):
+    if not validate_mobile_secret(secret):
+        storage.add_log("warning", "mobile_auth_failed")
+        return {"authorized": False, "items": [], "error": "invalid_secret"}
+    items = list_mobile_notifications(status="queued", limit=limit)
+    return {
+        "authorized": True,
+        "items": items,
+        "count": len(items),
+        "status": integration_status()["mobile"],
+    }
 
 
 def list_mobile_notifications(status="queued", limit=50):
@@ -142,7 +192,7 @@ def home_assistant_status():
     if not url or not token:
         return {"configured": False, "status": "not_configured"}
     try:
-        response = requests.get(url.rstrip("/") + "/api/", headers=home_assistant_headers(), timeout=8)
+        response = request_with_retry("GET", url.rstrip("/") + "/api/", headers=home_assistant_headers(), timeout=8)
         return {"configured": True, "status": "ok" if response.ok else "error", "code": response.status_code, "body": response.text[:300]}
     except requests.RequestException as exc:
         storage.add_log("warning", "home_assistant_status_failed", str(exc))
@@ -154,12 +204,16 @@ def call_home_assistant_service(domain, service, entity_id=None, data=None):
     token = os.getenv("HOME_ASSISTANT_TOKEN")
     if not url or not token:
         return {"status": "not_configured"}
+    clean_domain = storage.normalize_key(domain)
+    clean_service = storage.normalize_key(service)
+    if not clean_domain or clean_service not in ALLOWED_HOME_ASSISTANT_SERVICES:
+        return {"status": "invalid_service", "domain": clean_domain, "service": clean_service}
     payload = data.copy() if isinstance(data, dict) else {}
     if entity_id:
         payload["entity_id"] = entity_id
-    endpoint = f"{url.rstrip('/')}/api/services/{domain}/{service}"
+    endpoint = f"{url.rstrip('/')}/api/services/{clean_domain}/{clean_service}"
     try:
-        response = requests.post(endpoint, headers=home_assistant_headers(), json=payload, timeout=10)
+        response = request_with_retry("POST", endpoint, headers=home_assistant_headers(), json=payload, timeout=10)
         return {"status": "ok" if response.ok else "error", "code": response.status_code, "body": response.text[:500]}
     except requests.RequestException as exc:
         storage.add_log("warning", "home_assistant_service_failed", str(exc))

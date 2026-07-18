@@ -8,4 +8,5 @@ star.db-*
 screenshot_*.png
 screenshots/
 cloud_sync/
+chrome_profile/
 voice.mp3

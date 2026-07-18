@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from groq import Groq
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -157,8 +158,14 @@ def stop_speaking():
 # ------------------- BROWSER AUTOMATION -------------------
 
 def create_chrome_driver():
+    options = Options()
+    profile_dir = os.getenv("STAR_CHROME_PROFILE_DIR") or str(BASE_DIR / "chrome_profile")
+    options.add_argument(f"--user-data-dir={profile_dir}")
+    options.add_argument("--profile-directory=Default")
+    options.add_argument("--disable-notifications")
+    options.add_argument("--start-maximized")
     service = Service(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service)
+    return webdriver.Chrome(service=service, options=options)
 
 
 def check_instagram():
@@ -894,6 +901,19 @@ def handle_whatsapp_command(command):
     text = command.strip()
     lower_text = text.lower()
 
+    if lower_text in {"whatsapp status", "whatsapp login status", "check whatsapp"}:
+        driver = None
+        try:
+            driver = create_chrome_driver()
+            status = star_whatsapp.open_whatsapp(driver)
+            return status["message"]
+        except Exception as exc:
+            storage.add_log("warning", "whatsapp_status_failed", str(exc))
+            return "WhatsApp status check failed."
+        finally:
+            if driver:
+                driver.quit()
+
     parsed = parse_whatsapp_send(text)
     if parsed:
         contact, message = parsed
@@ -969,6 +989,12 @@ def handle_email_command(command):
         if status["configured"]:
             return f"Email is ready with {status['imap_host']} and {status['smtp_host']}."
         return "Email is not configured. Add EMAIL_ADDRESS and EMAIL_APP_PASSWORD in .env."
+
+    if lower_text in {"email test", "test email", "email connection test"}:
+        result = star_email.test_connection()
+        if not result["configured"]:
+            return "Email is not configured. Add EMAIL_ADDRESS and EMAIL_APP_PASSWORD in .env."
+        return f"Email test: IMAP {result['imap']}, SMTP {result['smtp']}."
 
     if lower_text in {"read emails", "show emails", "inbox", "show inbox"}:
         try:
@@ -2026,6 +2052,9 @@ def detect_tool_without_ai(user_text):
     email_phrases = [
         "email status",
         "mail status",
+        "email test",
+        "test email",
+        "email connection test",
         "read emails",
         "show emails",
         "show inbox",
@@ -2888,6 +2917,11 @@ def email_status():
     return star_email.status()
 
 
+@app.get("/email/test")
+def email_test():
+    return star_email.test_connection()
+
+
 @app.get("/email/inbox")
 def email_inbox(limit: int = 10, unread_only: bool = False):
     try:
@@ -3177,6 +3211,16 @@ def integrations_status():
     return star_integrations.integration_status()
 
 
+@app.get("/integrations/diagnostics")
+def integrations_diagnostics():
+    return {
+        "status": star_integrations.integration_status(),
+        "email": star_email.status(),
+        "smart_home": star_integrations.home_assistant_status(),
+        "mobile": star_integrations.mobile_pull(limit=5),
+    }
+
+
 @app.post("/integrations")
 def integrations_create(name: str, kind: str, status: str = "planned"):
     integration_id = star_integrations.save_integration(name, kind, status=status)
@@ -3201,6 +3245,11 @@ def cloud_sync():
 @app.get("/mobile/notifications")
 def mobile_notifications(status: str = "queued", limit: int = 50):
     return {"items": star_integrations.list_mobile_notifications(status=status, limit=limit)}
+
+
+@app.get("/mobile/pull")
+def mobile_pull(secret: Optional[str] = None, limit: int = 20):
+    return star_integrations.mobile_pull(secret=secret, limit=limit)
 
 
 @app.post("/mobile/notifications")
@@ -3357,6 +3406,20 @@ def whatsapp_send(contact: str, message: str):
         driver = create_chrome_driver()
         reply = star_whatsapp.send_message(driver, contact, message)
         return {"reply": reply}
+    finally:
+        if driver:
+            driver.quit()
+
+
+@app.get("/whatsapp/status")
+def whatsapp_status():
+    driver = None
+    try:
+        driver = create_chrome_driver()
+        return star_whatsapp.open_whatsapp(driver)
+    except Exception as exc:
+        storage.add_log("warning", "whatsapp_status_failed", str(exc))
+        return {"logged_in": False, "needs_login": True, "message": "WhatsApp status check failed.", "error": str(exc)}
     finally:
         if driver:
             driver.quit()
