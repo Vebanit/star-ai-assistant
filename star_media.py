@@ -1,8 +1,23 @@
+import random
 import subprocess
 import webbrowser
 from urllib.parse import quote_plus
 
 import pyautogui
+
+
+SAD_SONGS = {
+    "hindi": [
+        ("Channa Mereya", "284Ov7ysmfA"),
+        ("Agar Tum Saath Ho", "sK7riqg2mr4"),
+        ("Tum Hi Ho", "IJq0yyWug1k"),
+    ],
+    "english": [
+        ("Someone Like You", "hLQl3WQQoQ0"),
+        ("Let Her Go", "RBumgq5yVrA"),
+        ("Fix You", "k4V3Mo61fJM"),
+    ],
+}
 
 
 def play_pause():
@@ -23,6 +38,17 @@ def previous_track():
 def stop_media():
     pyautogui.press("stop")
     return "Stopped media."
+
+
+def play_youtube_video(video_id):
+    webbrowser.open(f"https://www.youtube.com/watch?v={video_id}&autoplay=1")
+
+
+def play_sad_song(language):
+    clean_language = "hindi" if str(language).lower().startswith("hin") else "english"
+    title, video_id = random.choice(SAD_SONGS[clean_language])
+    play_youtube_video(video_id)
+    return f"Playing a {clean_language} sad song: {title}."
 
 
 def open_youtube(query=None):
@@ -60,6 +86,13 @@ def open_vlc():
 
 def handle_media_command(command):
     text = command.lower().strip()
+
+    if "sad" in text and any(word in text for word in ["song", "music", "gaana", "gana"]):
+        if any(word in text for word in ["hindi", "hindee"]):
+            return play_sad_song("hindi")
+        if any(word in text for word in ["english", "angrezi"]):
+            return play_sad_song("english")
+        return "Hindi ya English?"
 
     if "youtube" in text:
         query = text.replace("open youtube", "").replace("play youtube", "").replace("youtube", "").strip()

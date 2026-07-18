@@ -67,6 +67,7 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY")) if os.getenv("GROQ_API_KEY") el
 
 current_process = None
 PENDING_CONFIRMATION = None
+PENDING_MEDIA_REQUEST = None
 SPEECH_CONTEXT = None
 ADAPTED_REPLY_CACHE = {}
 SUPPRESS_TTS = contextvars.ContextVar("SUPPRESS_TTS", default=False)
@@ -2196,6 +2197,53 @@ def security_gate(command, tool, callback):
     )
 
 
+def detect_music_language(text):
+    clean = star_voice.normalize_text(text)
+    hindi_words = {"hindi", "hindee", "bollywood"}
+    english_words = {"english", "angrezi", "angreji"}
+    if clean in hindi_words or any(word in clean.split() for word in hindi_words):
+        return "hindi"
+    if clean in english_words or any(word in clean.split() for word in english_words):
+        return "english"
+    return None
+
+
+def looks_like_song_request(text):
+    clean = star_voice.normalize_text(text)
+    has_song_word = any(word in clean for word in ["song", "music", "gaana", "gana"])
+    has_play_word = any(word in clean for word in ["play", "chala", "chalao", "chalana", "lagao", "baja"])
+    return has_song_word and (has_play_word or "sad" in clean)
+
+
+def handle_pending_media_request(command):
+    global PENDING_MEDIA_REQUEST
+
+    if not PENDING_MEDIA_REQUEST:
+        return None
+
+    clean = star_voice.normalize_text(command)
+    if star_voice.confirmation_intent(clean) == "cancel" or clean in {"skip", "leave it", "rehne do"}:
+        PENDING_MEDIA_REQUEST = None
+        return "Theek hai, song request cancel kar di."
+
+    language = detect_music_language(clean)
+    if not language:
+        return None
+
+    intent = PENDING_MEDIA_REQUEST.get("intent")
+    PENDING_MEDIA_REQUEST = None
+    if intent == "sad_song":
+        return star_media.play_sad_song(language)
+
+    return None
+
+
+def set_pending_media_request(intent):
+    global PENDING_MEDIA_REQUEST
+    PENDING_MEDIA_REQUEST = {"intent": intent, "created_at": datetime.datetime.utcnow()}
+    return "Hindi ya English?"
+
+
 # ------------------- ACTION ROUTING -------------------
 
 TOOLS = {
@@ -2356,6 +2404,8 @@ def detect_tool_without_ai(user_text):
 
     media_phrases = [
         "play music",
+        "play song",
+        "play sad song",
         "pause music",
         "play pause",
         "pause media",
@@ -2373,7 +2423,7 @@ def detect_tool_without_ai(user_text):
         "open netflix",
         "open vlc",
     ]
-    if any(text.startswith(phrase) or text == phrase for phrase in media_phrases):
+    if any(text.startswith(phrase) or text == phrase for phrase in media_phrases) or looks_like_song_request(text):
         return "media"
 
     coding_phrases = [
@@ -2747,7 +2797,17 @@ def detect_tool_without_ai(user_text):
     if any(text.startswith(phrase) or text == phrase for phrase in integration_phrases):
         return "integrations"
 
-    if text.startswith(("search", "google", "find")):
+    explicit_search_phrases = [
+        "search ",
+        "search for ",
+        "google ",
+        "google search",
+        "web search",
+        "internet search",
+        "find on google",
+        "find from google",
+    ]
+    if any(text.startswith(phrase) for phrase in explicit_search_phrases) or " search on google" in text:
         return "search"
 
     if text.startswith("open"):
@@ -2783,6 +2843,9 @@ def agent_brain(user_text):
 You are STAR's action planner.
 
 Decide which tool to use.
+Use search only when the user clearly asks for Google/web/internet search.
+For ordinary questions, chat, explanations, opinions, or factual answers, use none.
+For "play sad song" or "song chalao" requests, use media.
 
 TOOLS:
 open
@@ -3121,6 +3184,11 @@ def ask_star(user_text):
             storage.add_log("info", "voice_quiet_ignored", {"command": text})
             return ""
 
+        pending_media_reply = handle_pending_media_request(text)
+        if pending_media_reply:
+            speak(pending_media_reply)
+            return record_interaction(text, "media", "ok", pending_media_reply)
+
         voice_reply = handle_voice_command(text)
         if voice_reply:
             speak(voice_reply)
@@ -3157,6 +3225,8 @@ def ask_star(user_text):
             else:
                 tool_reply = run_tool(tool, action_text)
             if tool_reply:
+                if tool == "media" and tool_reply.strip().lower() == "hindi ya english?":
+                    tool_reply = set_pending_media_request("sad_song")
                 if tool == "voice" or (
                     PENDING_CONFIRMATION and star_voice.parse_bool(star_voice.get_settings().get("voice_spoken_confirmations"))
                 ):
