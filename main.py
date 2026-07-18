@@ -43,6 +43,7 @@ import star_email
 import star_calendar
 import star_contacts
 import star_clipboard
+import star_emotion
 import star_finance
 import star_health
 import star_integrations
@@ -64,6 +65,8 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY")) if os.getenv("GROQ_API_KEY") el
 
 current_process = None
 PENDING_CONFIRMATION = None
+SPEECH_CONTEXT = None
+ADAPTED_REPLY_CACHE = {}
 
 
 def infer_memory_category(key):
@@ -118,11 +121,23 @@ def search_internet(query):
 
 # ------------------- TTS -------------------
 
+def adapt_reply_for_context(reply, user_text=None):
+    context = user_text or SPEECH_CONTEXT
+    if not context:
+        return str(reply or "")
+    key = (str(context), str(reply or ""))
+    if key not in ADAPTED_REPLY_CACHE:
+        ADAPTED_REPLY_CACHE[key] = star_emotion.adapt_reply(reply, context, client=client)
+    return ADAPTED_REPLY_CACHE[key]
+
+
 def speak(text):
     global current_process
 
     if not text:
         return False
+
+    text = adapt_reply_for_context(str(text))
 
     if current_process and current_process.poll() is None:
         current_process.terminate()
@@ -2700,6 +2715,7 @@ def check_direct_memory(user_text):
 # ------------------- MAIN AI LOGIC -------------------
 
 def record_interaction(user_text, tool, status, reply):
+    reply = adapt_reply_for_context(reply, user_text=user_text)
     storage.add_command(user_text, tool, status, reply)
     storage.add_conversation("assistant", reply)
     star_voice.remember_interaction(user_text, reply)
@@ -2712,6 +2728,7 @@ def record_interaction(user_text, tool, status, reply):
 
 
 def ask_star(user_text):
+    global SPEECH_CONTEXT
     text = user_text.strip()
     lower_text = text.lower()
 
@@ -2719,65 +2736,67 @@ def ask_star(user_text):
         return "Please say something."
 
     storage.add_conversation("user", text)
+    SPEECH_CONTEXT = text
 
-    if any(phrase in lower_text for phrase in ["stop server", "close server", "shutdown server", "kill server", "stop backend", "close backend"]):
-        reply = "STAR server stays on in the background. Say stop to stop my speech, or sleep to stop listening until the wake word."
-        speak(reply)
-        return record_interaction(text, "runtime", "ok", reply)
+    try:
+        if any(phrase in lower_text for phrase in ["stop server", "close server", "shutdown server", "kill server", "stop backend", "close backend"]):
+            reply = "STAR server stays on in the background. Say stop to stop my speech, or sleep to stop listening until the wake word."
+            speak(reply)
+            return record_interaction(text, "runtime", "ok", reply)
 
-    confirmation_reply = handle_confirmation_command(text)
-    if confirmation_reply:
-        speak(confirmation_reply)
-        return record_interaction(text, "confirmation", "ok", confirmation_reply)
+        confirmation_reply = handle_confirmation_command(text)
+        if confirmation_reply:
+            speak(confirmation_reply)
+            return record_interaction(text, "confirmation", "ok", confirmation_reply)
 
-    action_text = star_language.normalize_command(text, client=client)
-    lower_action_text = action_text.lower()
-    if action_text != text:
-        storage.add_log("info", "language_normalized", {"original": text, "normalized": action_text})
+        action_text = star_language.normalize_command(text, client=client)
+        lower_action_text = action_text.lower()
+        if action_text != text:
+            storage.add_log("info", "language_normalized", {"original": text, "normalized": action_text})
 
-    memory_callback = lambda: handle_memory_command(action_text)
-    if star_security.classify_command(action_text)["requires_confirmation"] and any(
-        category == "memory_clear" for category in star_security.classify_command(action_text)["categories"]
-    ):
-        memory_reply = security_gate(action_text, "memory", memory_callback)
-    else:
-        memory_reply = memory_callback()
-    if memory_reply:
-        speak(memory_reply)
-        return record_interaction(text, "memory", "ok", memory_reply)
-
-    if open_chrome_and_search(action_text):
-        return record_interaction(text, "search", "ok", "Done.")
-
-    tool = agent_brain(action_text)
-    if tool != "none":
-        if tool in {"whatsapp", "browser", "automation", "email", "clipboard", "integrations"}:
-            tool_reply = security_gate(action_text, tool, lambda: run_tool(tool, action_text))
+        memory_callback = lambda: handle_memory_command(action_text)
+        if star_security.classify_command(action_text)["requires_confirmation"] and any(
+            category == "memory_clear" for category in star_security.classify_command(action_text)["categories"]
+        ):
+            memory_reply = security_gate(action_text, "memory", memory_callback)
         else:
-            tool_reply = run_tool(tool, action_text)
-        if tool_reply:
-            if PENDING_CONFIRMATION and star_voice.parse_bool(star_voice.get_settings().get("voice_spoken_confirmations")):
-                speak(tool_reply)
-            return record_interaction(text, tool, "ok", tool_reply)
+            memory_reply = memory_callback()
+        if memory_reply:
+            speak(memory_reply)
+            return record_interaction(text, "memory", "ok", memory_reply)
 
-    extract_memory(text)
+        if open_chrome_and_search(action_text):
+            return record_interaction(text, "search", "ok", "Done.")
 
-    direct = check_direct_memory(action_text)
-    if direct:
-        reply = f"It is {direct}."
-        speak(reply)
-        return record_interaction(text, "memory", "ok", reply)
+        tool = agent_brain(action_text)
+        if tool != "none":
+            if tool in {"whatsapp", "browser", "automation", "email", "clipboard", "integrations"}:
+                tool_reply = security_gate(action_text, tool, lambda: run_tool(tool, action_text))
+            else:
+                tool_reply = run_tool(tool, action_text)
+            if tool_reply:
+                if PENDING_CONFIRMATION and star_voice.parse_bool(star_voice.get_settings().get("voice_spoken_confirmations")):
+                    speak(tool_reply)
+                return record_interaction(text, tool, "ok", tool_reply)
 
-    internet_data = ""
-    if any(word in lower_action_text for word in ["latest", "today", "news", "price"]):
-        internet_data = search_internet(action_text)
+        extract_memory(text)
 
-    if not client:
-        reply = "Groq API key is missing, so I can only run local commands right now."
-        speak(reply)
-        return record_interaction(text, "none", "error", reply)
+        direct = check_direct_memory(action_text)
+        if direct:
+            reply = f"It is {direct}."
+            speak(reply)
+            return record_interaction(text, "memory", "ok", reply)
 
-    context = f"""
+        internet_data = ""
+        if any(word in lower_action_text for word in ["latest", "today", "news", "price"]):
+            internet_data = search_internet(action_text)
+
+        if not client:
+            reply = "Groq API key is missing, so I can only run local commands right now."
+            speak(reply)
+            return record_interaction(text, "none", "error", reply)
+
+        context = f"""
 You are STAR, Bajrangi's personal AI assistant.
 
 User memory:
@@ -2791,31 +2810,37 @@ Internet data:
 
 Rules:
 Reply short and natural.
+Detect the user's language and reply in the same language/script.
+Detect the user's emotional tone and match it with empathy.
+If the user is excited, sound excited. If frustrated, be calm and helpful. If sad, be gentle.
+For Hinglish, reply in natural Hinglish.
 
 User: {text}
 """
 
-    try:
-        res = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            temperature=0.5,
-            max_tokens=80,
-            messages=[{"role": "user", "content": context}],
-        )
-        reply = res.choices[0].message.content.strip()
-    except Exception as exc:
-        print("AI response failed:", exc)
-        reply = "I could not reach the AI service right now."
+        try:
+            res = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                temperature=0.5,
+                max_tokens=100,
+                messages=[{"role": "user", "content": context}],
+            )
+            reply = res.choices[0].message.content.strip()
+        except Exception as exc:
+            print("AI response failed:", exc)
+            reply = "I could not reach the AI service right now."
 
-    first_sentence = reply.split(".")[0].strip()
-    final_reply = f"{first_sentence}." if first_sentence else reply
+        first_sentence = reply.split(".")[0].strip()
+        final_reply = f"{first_sentence}." if first_sentence else reply
 
-    for sentence in reply.split("."):
-        sentence = sentence.strip()
-        if sentence:
-            speak(sentence)
+        for sentence in reply.split("."):
+            sentence = sentence.strip()
+            if sentence:
+                speak(sentence)
 
-    return record_interaction(text, "none", "ok", final_reply)
+        return record_interaction(text, "none", "ok", final_reply)
+    finally:
+        SPEECH_CONTEXT = None
 
 
 # ------------------- API ENDPOINTS -------------------
