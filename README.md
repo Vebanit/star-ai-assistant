@@ -8,7 +8,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 - Continuous speech recognition after wake word detection.
 - Voice brain settings for language fallback, listening timeout, phrase length, TTS voice/rate/pitch, repeat, stop, sleep, and spoken confirmation shortcuts.
 - FastAPI backend with `/ask-star`, `/voice/status`, `/voice/settings`, `/memory`, `/history`, `/commands`, `/logs`, `/settings`, `/stop`, and `/health`.
-- Web dashboard at `/dashboard` with chat, status, memory, tasks, reminders, logs, and command history.
+- Web dashboard at `/dashboard` with chat, status, memory, tasks, reminders, voice settings, integrations, suggestions, logs, and command history.
 - Groq-powered assistant replies and action planning.
 - Edge TTS voice output.
 - Persistent SQLite memory in `star.db`.

@@ -25,7 +25,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -124,7 +125,8 @@ h3 {
 .top-actions,
 .panel-head,
 .inline-form,
-.chat-form {
+.chat-form,
+.control-strip {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -306,7 +308,8 @@ th {
   align-self: flex-start;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--line);
@@ -323,8 +326,45 @@ input {
   margin-bottom: 12px;
 }
 
+.stack-form.compact-form {
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 180px) auto;
+  margin-top: 12px;
+}
+
 .inline-form {
   margin-bottom: 12px;
+}
+
+.settings-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-form label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-form .check-row {
+  grid-template-columns: 20px 1fr;
+  align-items: center;
+  align-content: center;
+}
+
+.settings-form .check-row input {
+  width: auto;
+  min-height: auto;
+}
+
+.settings-form .button {
+  grid-column: 1 / -1;
 }
 
 .list {
@@ -340,7 +380,35 @@ input {
 .item-actions {
   margin-top: 8px;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pill.ok {
+  background: #e6f4ee;
+  color: var(--accent);
+}
+
+.pill.warn {
+  background: #fff3e8;
+  color: var(--accent-2);
+}
+
+.control-strip {
+  flex-wrap: wrap;
+  margin: 14px 0;
 }
 
 .status-list {
@@ -375,7 +443,7 @@ input {
   }
 
   .nav {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .metrics,
@@ -394,7 +462,9 @@ input {
   .top-actions,
   .inline-form,
   .chat-form,
-  .stack-form {
+  .stack-form,
+  .stack-form.compact-form,
+  .settings-form {
     display: grid;
     grid-template-columns: 1fr;
   }

@@ -22,6 +22,9 @@
           <button class="nav-item" data-view="chat">Chat</button>
           <button class="nav-item" data-view="memory">Memory</button>
           <button class="nav-item" data-view="tasks">Tasks</button>
+          <button class="nav-item" data-view="voice">Voice</button>
+          <button class="nav-item" data-view="integrations">Integrations</button>
+          <button class="nav-item" data-view="suggestions">Suggestions</button>
           <button class="nav-item" data-view="analytics">Analytics</button>
           <button class="nav-item" data-view="logs">Logs</button>
         </nav>
@@ -154,6 +157,138 @@
               <div class="list" id="reminderList"></div>
             </section>
           </div>
+        </section>
+
+        <section class="view" id="voiceView">
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Voice Settings</h3>
+                <button class="button small secondary" id="repeatVoiceBtn">Repeat</button>
+              </div>
+              <form class="settings-form" id="voiceForm">
+                <label>
+                  <span>Language</span>
+                  <select id="voiceLanguage">
+                    <option value="auto">Auto</option>
+                    <option value="hi-IN">Hindi</option>
+                    <option value="en-IN">English India</option>
+                    <option value="en-US">English US</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Mode</span>
+                  <select id="voiceMode">
+                    <option value="conversation">Conversation</option>
+                    <option value="command">Command</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Timeout</span>
+                  <input id="voiceTimeout" type="number" min="1" max="20" step="1" />
+                </label>
+                <label>
+                  <span>Phrase Limit</span>
+                  <input id="voicePhraseLimit" type="number" min="1" max="30" step="1" />
+                </label>
+                <label>
+                  <span>Pause</span>
+                  <input id="voicePause" type="number" min="0.2" max="2.5" step="0.1" />
+                </label>
+                <label>
+                  <span>Energy</span>
+                  <input id="voiceEnergy" type="number" min="50" max="4000" step="10" />
+                </label>
+                <label>
+                  <span>TTS Voice</span>
+                  <input id="ttsVoice" type="text" />
+                </label>
+                <label>
+                  <span>TTS Rate</span>
+                  <input id="ttsRate" type="text" />
+                </label>
+                <label>
+                  <span>TTS Pitch</span>
+                  <input id="ttsPitch" type="text" />
+                </label>
+                <label class="check-row">
+                  <input id="spokenConfirmations" type="checkbox" />
+                  <span>Spoken confirmations</span>
+                </label>
+                <button class="button" type="submit">Save Voice</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Voice State</h3>
+                <button class="button small danger" id="voiceStopBtn">Stop</button>
+              </div>
+              <div class="system-grid" id="voiceStatusGrid"></div>
+              <div class="control-strip">
+                <button class="button secondary" id="confirmBtn">Confirm</button>
+                <button class="button danger" id="cancelBtn">Cancel</button>
+              </div>
+              <div class="list dense" id="voiceLastList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="integrationsView">
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Cloud & Mobile</h3>
+                <button class="button small secondary" id="cloudSyncBtn">Sync</button>
+              </div>
+              <div class="system-grid" id="integrationStatusGrid"></div>
+              <form class="stack-form compact-form" id="mobileForm">
+                <input id="mobileTitle" type="text" placeholder="title" />
+                <input id="mobileBody" type="text" placeholder="message" />
+                <button class="button" type="submit">Queue</button>
+              </form>
+              <div class="list dense" id="mobileList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Smart Home</h3>
+                <button class="button small secondary" id="smartHomeRefreshBtn">Check</button>
+              </div>
+              <div class="system-grid" id="smartHomeGrid"></div>
+              <form class="stack-form compact-form" id="smartHomeForm">
+                <input id="smartEntity" type="text" placeholder="light.kitchen" />
+                <select id="smartService">
+                  <option value="turn_on">Turn On</option>
+                  <option value="turn_off">Turn Off</option>
+                </select>
+                <button class="button" type="submit">Run</button>
+              </form>
+              <p class="briefing" id="smartHomeResult"></p>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Saved Integrations</h3>
+            </div>
+            <form class="stack-form compact-form" id="integrationForm">
+              <input id="integrationName" type="text" placeholder="name" />
+              <input id="integrationKind" type="text" placeholder="kind" />
+              <button class="button" type="submit">Save</button>
+            </form>
+            <div class="list" id="integrationsList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="suggestionsView">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Smart Suggestions</h3>
+              <button class="button small secondary" id="suggestionsRefreshBtn">Refresh</button>
+            </div>
+            <div class="list" id="suggestionsList"></div>
+          </section>
         </section>
 
         <section class="view" id="analyticsView">
