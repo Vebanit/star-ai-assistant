@@ -6,6 +6,7 @@ STAR is a local voice assistant for Windows. It listens for the custom wake word
 
 - Wake word activation with Picovoice Porcupine.
 - Continuous speech recognition after wake word detection.
+- Background runtime scripts for duplicate-safe start, status, manual stop, and Windows logon auto-start.
 - Voice brain settings for language fallback, listening timeout, phrase length, TTS voice/rate/pitch, repeat, stop, sleep, and spoken confirmation shortcuts.
 - FastAPI backend with `/ask-star`, `/voice/status`, `/voice/settings`, `/memory`, `/history`, `/commands`, `/logs`, `/settings`, `/stop`, and `/health`.
 - Web dashboard at `/dashboard` with chat, status, memory, tasks, reminders, voice settings, integrations, suggestions, logs, and command history.
@@ -73,11 +74,13 @@ EMAIL_ADDRESS=your_email_address
 EMAIL_APP_PASSWORD=your_email_app_password
 ```
 
-4. Start the backend.
+4. Start STAR manually.
 
 ```powershell
-uvicorn main:app --reload
+.\scripts\start_star.ps1
 ```
+
+This starts the backend and wake-word listener in the background. It is duplicate-safe, so running it again will not start extra backend copies.
 
 5. Open the dashboard.
 
@@ -85,11 +88,29 @@ uvicorn main:app --reload
 http://127.0.0.1:8000/dashboard
 ```
 
-6. In another terminal, start wake word listening.
+6. Install auto-start once.
 
 ```powershell
-python wake_word.py
+.\scripts\install_startup.ps1
 ```
+
+After this, STAR starts automatically when this Windows user logs in. It keeps running until the laptop shuts down, restarts, or you manually stop it.
+
+Useful runtime scripts:
+
+```powershell
+.\scripts\status_star.ps1
+.\scripts\stop_star.ps1
+.\scripts\uninstall_startup.ps1
+```
+
+Voice behavior:
+
+- `stop` stops STAR's current speech only. It does not stop the server.
+- `sleep` exits conversation mode and keeps wake-word listening alive.
+- `stop server`, `close backend`, and similar commands are blocked from voice so the server stays on.
+- To fully stop STAR manually, use `.\scripts\stop_star.ps1`.
+- If `status_star.ps1` shows `PorcupineActivationRefusedError`, update `PICOVOICE_ACCESS_KEY` in `.env` with a valid Picovoice key and run `.\scripts\start_star.ps1` again.
 
 ## Useful Commands
 

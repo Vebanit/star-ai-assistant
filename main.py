@@ -2576,6 +2576,11 @@ def ask_star(user_text):
 
     storage.add_conversation("user", text)
 
+    if any(phrase in lower_text for phrase in ["stop server", "close server", "shutdown server", "kill server", "stop backend", "close backend"]):
+        reply = "STAR server stays on in the background. Say stop to stop my speech, or sleep to stop listening until the wake word."
+        speak(reply)
+        return record_interaction(text, "runtime", "ok", reply)
+
     confirmation_reply = handle_confirmation_command(text)
     if confirmation_reply:
         speak(confirmation_reply)

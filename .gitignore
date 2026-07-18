@@ -9,4 +9,5 @@ screenshot_*.png
 screenshots/
 cloud_sync/
 chrome_profile/
+runtime/
 voice.mp3
