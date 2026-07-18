@@ -2,6 +2,7 @@ import os
 import struct
 import sys
 import time
+import audioop
 from pathlib import Path
 
 import requests
@@ -14,6 +15,7 @@ import star_voice
 BASE_URL = "http://127.0.0.1:8000"
 WAKE_WORD_FILE = "Hello-STAR_en_windows_v4_0_0.ppn"
 WAKE_REPLY_SETTLE_SECONDS = 1.4
+FALLBACK_WAKE_COOLDOWN_SECONDS = 8.0
 
 load_dotenv()
 try:
@@ -26,6 +28,38 @@ recognizer = sr.Recognizer()
 recognizer.non_speaking_duration = 0.25
 recognizer.dynamic_energy_threshold = True
 conversation_mode = False
+last_fallback_wake = 0
+
+
+def audio_stats(audio):
+    raw = audio.get_raw_data()
+    sample_width = audio.sample_width
+    sample_rate = audio.sample_rate
+    duration = len(raw) / max(1, sample_rate * sample_width)
+    rms = audioop.rms(raw, sample_width) if raw else 0
+    peak = audioop.max(raw, sample_width) if raw else 0
+    return {"duration": duration, "rms": rms, "peak": peak}
+
+
+def should_fallback_wake(audio, settings):
+    global last_fallback_wake
+
+    stats = audio_stats(audio)
+    energy = int(float(settings.get("voice_energy_threshold", "300")))
+    now = time.time()
+    is_short_phrase = 0.35 <= stats["duration"] <= 2.4
+    is_clear_voice = (
+        stats["rms"] >= max(240, energy * 0.8) and stats["peak"] >= max(2400, energy * 7)
+    ) or stats["peak"] >= max(3800, energy * 11)
+    cooled_down = now - last_fallback_wake >= FALLBACK_WAKE_COOLDOWN_SECONDS
+    print(
+        f"Wake audio not recognized: duration={stats['duration']:.2f}s rms={stats['rms']} peak={stats['peak']}",
+        flush=True,
+    )
+    if is_short_phrase and is_clear_voice and cooled_down:
+        last_fallback_wake = now
+        return True
+    return False
 
 
 def apply_voice_settings(settings=None):
@@ -123,6 +157,7 @@ def handle_spoken_command(command, used_language=None):
 def listen_continuous():
     global conversation_mode
 
+    idle_misses = 0
     while conversation_mode:
         settings = apply_voice_settings()
         with sr.Microphone() as source:
@@ -136,9 +171,22 @@ def listen_continuous():
                     phrase_time_limit=int(float(settings.get("voice_phrase_time_limit", "6"))),
                 )
             except sr.WaitTimeoutError:
+                idle_misses += 1
+                if idle_misses >= 2:
+                    print("No command heard. Returning to wake mode.", flush=True)
+                    conversation_mode = False
+                    return
                 continue
 
         command, used_language = recognize_with_fallback(audio, settings, strip_wake=True)
+        if not command:
+            idle_misses += 1
+            if idle_misses >= 2:
+                print("No clear command heard. Returning to wake mode.", flush=True)
+                conversation_mode = False
+                return
+            continue
+        idle_misses = 0
         handle_spoken_command(command, used_language)
 
 
@@ -159,10 +207,19 @@ def listen_for_speech_wake():
 
         transcript, used_language = recognize_with_fallback(audio, settings, strip_wake=False)
         if not transcript:
+            if should_fallback_wake(audio, settings):
+                print("Fallback wake from short clear voice audio.", flush=True)
+                conversation_mode = True
+                response = call_star("/voice/wake", method="post")
+                if response is not None:
+                    print("Wake acknowledgement sent.", flush=True)
+                time.sleep(WAKE_REPLY_SETTLE_SECONDS)
+                listen_continuous()
             continue
 
         phrase = star_voice.detect_wake_phrase(transcript, settings=settings)
         if not phrase:
+            print(f"Heard without wake phrase ({used_language}): {transcript}", flush=True)
             continue
 
         print(f"Wake phrase detected: {phrase}", flush=True)

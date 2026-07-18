@@ -11,7 +11,7 @@ DEFAULT_SETTINGS = {
     "voice_timeout": "3",
     "voice_phrase_time_limit": "4",
     "voice_pause_threshold": "0.45",
-    "voice_energy_threshold": "300",
+    "voice_energy_threshold": "650",
     "voice_spoken_confirmations": "true",
     "voice_quiet": "false",
     "wake_engine": "auto",
