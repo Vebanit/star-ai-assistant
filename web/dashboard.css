@@ -165,6 +165,62 @@ h3 {
   padding: 0 10px;
 }
 
+.star-power-dock {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 50;
+  min-width: 190px;
+  border: 1px solid rgba(22, 116, 95, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 38px rgba(29, 37, 34, 0.18);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.star-power-dock.off {
+  border-color: rgba(180, 35, 24, 0.32);
+}
+
+.power-label {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+#starPowerState {
+  display: block;
+  color: var(--accent);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.star-power-dock.off #starPowerState {
+  color: var(--danger);
+}
+
+.power-button {
+  min-height: 34px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  padding: 0 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.star-power-dock.off .power-button {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
 .view {
   display: none;
 }
@@ -494,5 +550,12 @@ textarea {
 
   .message {
     max-width: 100%;
+  }
+
+  .star-power-dock {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    min-width: 0;
   }
 }

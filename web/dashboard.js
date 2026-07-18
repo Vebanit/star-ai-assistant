@@ -283,6 +283,14 @@ function renderVoice(voice) {
   `;
 }
 
+function renderPowerDock(voice) {
+  const quiet = checked(voice.settings?.voice_quiet);
+  $("#starPowerDock").classList.toggle("off", quiet);
+  $("#starPowerState").textContent = quiet ? "OFF" : "ON";
+  $("#starPowerBtn").textContent = quiet ? "Turn On" : "Turn Off";
+  $("#starPowerBtn").title = quiet ? "Resume STAR replies. Server stays on." : "Put STAR in quiet mode. Server stays on.";
+}
+
 function phonePayloadForAction(action, value) {
   const textValue = value.trim();
   if (action === "speak") return { text: textValue || "Hello from STAR" };
@@ -492,6 +500,7 @@ async function refreshAll() {
   renderHistory(history.items);
   renderAnalytics(analytics);
   renderVoice(voice);
+  renderPowerDock(voice);
   renderSuggestions(suggestions.items);
   renderIntegrations(integrationStatus, integrations, mobile, smartHome, pairing, phoneDevices, phoneActions);
 }
@@ -548,6 +557,13 @@ function bindEvents() {
   $("#voiceResumeBtn").addEventListener("click", async () => {
     const result = await api("/voice/resume", { method: "POST" });
     addMessage("assistant", result.reply || "");
+    await refreshAll();
+  });
+
+  $("#starPowerBtn").addEventListener("click", async () => {
+    const isOff = $("#starPowerDock").classList.contains("off");
+    const result = await api(isOff ? "/voice/resume" : "/voice/quiet", { method: "POST" });
+    if (result.reply) addMessage("assistant", result.reply);
     await refreshAll();
   });
 
