@@ -1,76 +1,74 @@
 # STAR Assistant
 
-STAR is a local voice assistant for Windows. It listens for the custom wake word, sends spoken commands to a FastAPI backend, uses Groq for AI responses, and can run local PC actions such as opening apps, searching the web, taking screenshots, and basic WhatsApp/Instagram automation.
+<p align="center">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-1f6feb?style=for-the-badge">
+  <img alt="Backend" src="https://img.shields.io/badge/backend-FastAPI-0f9d58?style=for-the-badge">
+  <img alt="Voice" src="https://img.shields.io/badge/voice-wake%20word%20%2B%20TTS-8b5cf6?style=for-the-badge">
+  <img alt="Mobile" src="https://img.shields.io/badge/mobile-Termux%20bridge-f59e0b?style=for-the-badge">
+  <img alt="Storage" src="https://img.shields.io/badge/storage-SQLite-64748b?style=for-the-badge">
+</p>
 
-## Features
+STAR is a local-first desktop assistant for Windows. It listens for `hello star`, understands Hinglish, Hindi-style commands, and English, speaks back with Edge TTS, controls the laptop, remembers useful context, runs productivity workflows, and can extend to Android through a secure Termux phone bridge.
 
-- Free keyless wake activation with speech phrases such as `hello star`, `hey star`, and `star`.
-- Optional Picovoice Porcupine wake word support if you install `pvporcupine` and provide an AccessKey.
-- Continuous speech recognition after wake word detection.
-- Background runtime scripts for duplicate-safe start, status, manual stop, and Windows logon auto-start.
-- Voice brain settings for language fallback, listening timeout, phrase length, TTS voice/rate/pitch, repeat, stop, sleep, and spoken confirmation shortcuts.
-- FastAPI backend with `/ask-star`, `/voice/status`, `/voice/settings`, `/memory`, `/history`, `/commands`, `/logs`, `/settings`, `/stop`, and `/health`.
-- Web dashboard at `/dashboard` with chat, status, memory, tasks, reminders, voice settings, integrations, suggestions, logs, and command history.
-- Groq-powered assistant replies and action planning.
-- Edge TTS voice output.
-- Female Edge TTS voice by default, currently `en-US-JennyNeural`.
-- Emotion-aware replies that infer the user's tone and answer in the same language or style, with spoken Indian Hindi/Hinglish instead of stiff translation.
-- Persistent SQLite memory in `star.db`.
-- Conversation history, command history, and local logs.
-- Memory edit, recall, and forget commands.
-- App, website, and folder opening.
-- Strong close commands for apps/browsers with English, Hinglish, and Hindi-style phrases like `close chrome`, `chrome band karo`, and `notepad bandh karo`.
-- Screenshot, click, scroll, and typing controls through PyAutoGUI.
-- System status for CPU, RAM, disk, battery, network, Windows info, processes, and installed apps.
-- Volume and brightness controls.
-- Confirmation flow for shutdown, restart, sleep, and lock commands.
-- File search, file reading, file summary, and folder analysis.
-- Research search, latest news, weather lookup, Wikipedia-style lookup, and webpage summary.
-- Notes, tasks/to-do list, reminders, daily briefing, and Pomodoro timer.
-- Calendar events, today/tomorrow agenda, upcoming events, cancel, and delete.
-- Contacts/address book for saved names, email addresses, phone numbers, lookup, update, and delete.
-- Clipboard and snippets helper for copy/read/paste plus reusable text templates.
-- Finance tracker for income, expenses, category breakdowns, monthly balance, and transaction history.
-- Health and habit tracker for water, mood, sleep, workout, weight, and daily wellness summaries.
-- Multilingual command normalization for Hinglish/Hindi/local phrases, with optional Groq-powered command translation.
-- Hinglish-friendly voice cleanup for common misheard words such as confirm/cancel, plus English/Hindi recognition fallback.
-- Worldwide same-language response adaptation for natural conversation tone and emotion matching.
-- Self-learning smart suggestions from usage patterns, tasks, reminders, health, finance, and recent errors.
-- Cloud/mobile/smart-home foundation with local cloud snapshots, mobile companion page, notification queue, integration registry, and Home Assistant hooks.
-- Browser tab controls, Google/DuckDuckGo search, and file download helper.
-- Media controls for play/pause, next/previous, YouTube, Spotify, Netflix, and VLC.
-- WhatsApp chat search/send helpers through WhatsApp Web.
-- WhatsApp persistent Chrome profile, login status checks, and better Selenium waits for WhatsApp Web.
-- Email IMAP/SMTP connection diagnostics, timeout settings, and retry handling.
-- Mobile companion at `/mobile` with wake listening, command sending, mobile speech replies, notifications, and optional shared-secret auth.
-- Android Termux bridge for phone-side actions such as find phone, speak, vibrate, notifications, URL/deep-link intents, share, call/SMS intent, battery, volume, brightness, media keys, torch, clipboard, location, Wi-Fi, and device info.
-- Smart-home validation and retry handling for Home Assistant service calls.
-- Coding helper for project analysis, code search, explain/review file, and Python compile checks.
-- Git helper for status, log, diff, branch, remotes, and confirmed commit/pull/push.
-- Smart automation for scheduled commands, simple workflows, due runs, and automation history.
-- Security mode, permission checks, confirmation gates, secret health, and audit logs.
-- Analytics for command success rate, top tools, daily activity, productivity, memory, and recent issues.
-- Vision helper for screenshots, image analysis, OCR, QR/barcode scan, and image comparison.
-- Email helper for IMAP inbox, unread/search, SMTP send, archive, and delete.
-- Google search command support.
-- Basic WhatsApp Web and Instagram DM automation through Selenium.
+The project is built like a personal operating layer: a FastAPI brain, a wake-word listener, a web dashboard, persistent SQLite memory, local automation tools, optional Groq intelligence, and a mobile companion that lets the phone participate without turning the laptop server off.
 
-## Setup
+## Experience
 
-1. Create or activate the virtual environment.
+STAR is meant to feel like a practical assistant sitting on your machine, not a demo script. You can say `hello star open chrome`, ask for your agenda, close apps in Hinglish, run WhatsApp helpers, queue phone actions, or put STAR into sleep/quiet mode without killing the backend.
+
+| Surface | What it does |
+| --- | --- |
+| Voice runtime | Wake phrase, continuous listening, stop/repeat/sleep/quiet/resume controls |
+| Web dashboard | Chat, memory, tasks, voice settings, integrations, analytics, logs, phone pairing |
+| Mobile web | Phone browser command mode with phone-side spoken replies |
+| Android bridge | Termux worker for phone actions like vibrate, speak, torch, volume, media, clipboard, location |
+| Local brain | SQLite memory, conversation history, logs, command history, suggestions, confirmations |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    User["User voice / dashboard / mobile"] --> Wake["Wake listener"]
+    Wake --> API["FastAPI STAR backend"]
+    API --> Memory["SQLite memory and logs"]
+    API --> Tools["Windows tools and integrations"]
+    API --> Voice["Edge TTS speaker"]
+    API --> Web["Dashboard and mobile web"]
+    API --> Queue["Mobile action queue"]
+    Queue --> Bridge["Android Termux bridge"]
+    Bridge --> Phone["Phone actions"]
+```
+
+## Capability Map
+
+| Area | Highlights |
+| --- | --- |
+| Voice | Free speech wake mode, optional Picovoice, female TTS, multilingual fallback, quiet mode, wake-only sleep mode |
+| Language | Hinglish-friendly cleanup, Hindi/local command normalization, same-language emotional replies |
+| Laptop control | Open/close apps, browser tabs, screenshots, typing, scrolling, volume, brightness, system status |
+| Productivity | Notes, tasks, reminders, calendar, daily briefing, Pomodoro, contacts, clipboard, snippets |
+| Knowledge | Research search, latest news, weather, Wikipedia-style lookup, webpage and file summaries |
+| Personal data | Finance tracker, health logs, memory recall/edit/forget, analytics, command history |
+| Messaging | WhatsApp Web helpers, email IMAP/SMTP helpers, mobile notifications |
+| Automation | Scheduled commands, simple workflows, due runs, action history |
+| Security | Confirmation gates, blocked server-stop voice commands, audit logs, mobile shared-secret pairing |
+| Mobile | Mobile web companion plus Android bridge for phone-side speak, vibrate, notification, torch, volume, media keys, clipboard, location, Wi-Fi and device info |
+| Smart home | Home Assistant status and service-call foundation |
+| Coding/Git | Project analysis, code search, explain/review file, compile check, git status/log/diff/branch/commit/push |
+
+## Quick Start
+
+### 1. Create the environment
 
 ```powershell
 python -m venv venv
 .\venv\Scripts\activate
-```
-
-2. Install dependencies.
-
-```powershell
 pip install -r requirements.txt
 ```
 
-3. Create `.env` with these keys.
+### 2. Configure optional secrets
+
+Create `.env` in the project root.
 
 ```env
 GROQ_API_KEY=your_groq_key
@@ -78,380 +76,235 @@ EMAIL_ADDRESS=your_email_address
 EMAIL_APP_PASSWORD=your_email_app_password
 ```
 
-`PICOVOICE_ACCESS_KEY` is optional now. Without it, STAR uses the free keyless speech wake mode.
+`PICOVOICE_ACCESS_KEY` is optional. Without it, STAR uses the free keyless speech wake mode.
 
-4. Start STAR manually.
+### 3. Start STAR
 
 ```powershell
 .\scripts\start_star.ps1
 ```
 
-This starts the backend and wake-word listener in the background. It is duplicate-safe, so running it again will not start extra backend copies.
+The script starts the backend and wake listener in the background. It is duplicate-safe, so running it again will not create extra backend copies.
 
-5. Open the dashboard.
+### 4. Open the dashboard
 
 ```text
 http://127.0.0.1:8000/dashboard
 ```
 
-Mobile companion:
-
-```text
-http://127.0.0.1:8000/mobile
-```
-
-Use `.\scripts\status_star.ps1` to see your phone-ready Mobile companion URL. From your phone, connect to the same Wi-Fi and open the `http://YOUR-LAPTOP-IP:8000/mobile` URL. Tap `Start Wake`, allow microphone access, then say `hello star`. Mobile browser microphone wake mode may need a secure browser context depending on the phone/browser.
-
-Mobile web commands run through the laptop STAR server, but replies are spoken on the phone page. Full phone system control needs a native Android companion or Termux bridge because mobile browsers cannot access the whole phone system.
-
-Android phone bridge setup is in `mobile_bridge/README.md`.
-For secure pairing, open the dashboard Integrations tab, use `Rotate Secret`, then copy the generated Termux commands into the phone.
-
-6. Install auto-start once.
-
-```powershell
-.\scripts\install_startup.ps1
-```
-
-After this, STAR starts automatically when this Windows user logs in. It keeps running until the laptop shuts down, restarts, or you manually stop it.
-
-Useful runtime scripts:
+Runtime helpers:
 
 ```powershell
 .\scripts\status_star.ps1
 .\scripts\stop_star.ps1
+.\scripts\install_startup.ps1
 .\scripts\uninstall_startup.ps1
 ```
 
-Voice behavior:
+After `install_startup.ps1`, STAR starts automatically when the Windows user logs in. It keeps running until the laptop shuts down, restarts, or you manually stop it.
 
-- `stop` stops STAR's current speech only. It does not stop the server.
-- `star u can sleep`, `star sleep`, or `star so ja` exits command mode and keeps wake listening alive.
-- `hello star` wakes STAR again after sleep mode.
-- `star abhi chup` or `star band ho ja` puts STAR in quiet mode. It keeps listening, but ignores normal conversation.
-- `ok star you can talk`, `ok sar u can talk`, or `chal star tu ab baat kar sakta hai` resumes replies.
-- `stop server`, `close backend`, and similar commands are blocked from voice so the server stays on.
-- To fully stop STAR manually, use `.\scripts\stop_star.ps1`.
-- If Picovoice fails or no key is configured, STAR falls back to free keyless speech wake mode.
+## Voice Behavior
 
-## Useful Commands
+| Say this | Result |
+| --- | --- |
+| `hello star` | Wake STAR and start command mode |
+| `stop` | Stop current speech only, server stays on |
+| `repeat` or `dobara bolo` | Repeat last response |
+| `star u can sleep` / `star sleep` / `star so ja` | Exit command mode and keep wake listening alive |
+| `hello star` after sleep | Start listening again |
+| `star abhi chup` / `star band ho ja` | Quiet mode; normal conversation is ignored |
+| `ok star you can talk` / `chal star tu ab baat kar sakta hai` | Resume replies from quiet mode |
+| `stop server` / `close backend` | Blocked from voice so the server does not get killed accidentally |
 
-- `open chrome`
-- `close chrome`
-- `chrome band karo`
-- `notepad bandh karo`
-- `close current tab`
-- `close current window`
-- `open downloads`
-- `search Python tutorials`
-- `take screenshot`
-- `scroll down`
-- `close chrome`
-- `what is my name`
-- `remember my city is Ahmedabad`
-- `what do you remember`
-- `forget my city`
-- `system status`
-- `cpu usage`
-- `battery status`
-- `show running processes`
-- `show installed apps`
-- `volume up`
-- `brightness down`
-- `shutdown pc` then `confirm` or `cancel`
-- `find file README`
-- `read file README.md`
-- `summarize file main.py`
-- `analyze folder downloads`
-- `weather Ahmedabad`
-- `latest news AI`
-- `research Python FastAPI`
-- `wikipedia Alan Turing`
-- `summarize webpage https://example.com`
-- `add note buy milk`
-- `show notes`
-- `add task finish STAR dashboard`
-- `show tasks`
-- `complete task 1`
-- `remind me to drink water in 10 minutes`
-- `show reminders`
-- `daily briefing`
-- `add event dentist tomorrow at 5 pm for 30 minutes location clinic`
-- `today agenda`
-- `tomorrow agenda`
-- `upcoming events`
-- `cancel event 1`
-- `delete event 1`
-- `add contact Bajrangi email bajrangi@example.com phone +919999999999`
-- `show contacts`
-- `find contact Bajrangi`
-- `set contact email Bajrangi to bajrangi@example.com`
-- `set contact phone Bajrangi to +919999999999`
-- `delete contact 1`
-- `read clipboard`
-- `copy text hello from STAR`
-- `paste text hello from STAR` then `confirm` or `cancel`
-- `save snippet greeting as hello, how are you?`
-- `show snippets`
-- `search snippets greeting`
-- `copy snippet 1`
-- `paste snippet 1` then `confirm` or `cancel`
-- `delete snippet 1`
-- `add expense 250 for food note lunch`
-- `add income 5000 for salary`
-- `finance summary`
-- `monthly expenses`
-- `expense categories`
-- `show transactions`
-- `delete transaction 1`
-- `log water 500 ml`
-- `log sleep 7 hours`
-- `log workout 30 minutes running`
-- `log weight 72 kg`
-- `log mood happy`
-- `health summary`
-- `show health logs`
-- `delete health log 1`
-- `chrome kholo`
-- `aaj ka agenda`
-- `suggestion do`
-- `smart suggestions`
-- `dismiss suggestion log_water`
-- `integration status`
-- `email test`
-- `whatsapp status`
-- `cloud sync now`
-- `send mobile notification STAR message Check your tasks`
-- `mobile notifications`
-- `smart home status`
-- `smart home turn on light.kitchen` then `confirm` or `cancel`
-- `voice status`
-- `voice language hindi`
-- `voice language hinglish`
-- `voice language english`
-- `wake engine speech`
-- `repeat`
-- `dobara bolo`
-- `stop`
-- `sleep`
-- `haan` or `kar de` for confirmation
-- `nahi` or `mat kar` to cancel confirmation
-- `start pomodoro 25`
-- `pomodoro status`
-- `open website openai.com`
-- `google search FastAPI tutorial`
-- `duckduckgo search Python automation`
-- `new tab github.com`
-- `close tab`
-- `next tab`
-- `refresh page`
-- `download file https://example.com/file.zip`
-- `play music`
-- `next song`
-- `open youtube lo-fi music`
-- `open spotify`
-- `open netflix`
-- `send whatsapp to Bajrangi message hello`
-- `open whatsapp chat Bajrangi`
-- `analyze project`
-- `search code FastAPI`
-- `explain file main.py`
-- `review file main.py`
-- `run compile check`
-- `git status`
-- `git log 5`
-- `git diff`
-- `git commit update STAR features` then `confirm` or `cancel`
-- `schedule command system status in 10 minutes`
-- `schedule daily briefing at 9 am`
-- `create workflow system status then show tasks`
-- `show automations`
-- `run automations`
-- `pause automation 1`
-- `resume automation 1`
-- `delete automation 1`
-- `security status`
-- `security mode strict`
-- `security mode normal`
-- `check permission send whatsapp to Bajrangi message hello`
-- `audit logs`
-- `analytics summary`
-- `usage stats`
-- `top tools`
-- `daily activity`
-- `recent errors`
-- `take screenshot`
-- `analyze screen`
-- `read screen`
-- `analyze image screenshot_153709.png`
-- `ocr image screenshot_153709.png`
-- `scan qr qr.png`
-- `compare images first.png and second.png`
-- `email status`
-- `read emails`
-- `unread emails`
-- `search emails invoice`
-- `send email to friend@example.com subject Hello message Hi there`
-- `send email to Bajrangi subject Hello message Hi there`
-- `archive email 123`
-- `delete email 123`
-- `check whatsapp`
+## Mobile Companion
 
-## API Helpers
+STAR has two mobile layers.
 
-- `GET /dashboard` - STAR web dashboard.
-- `GET /memory` - view memory with metadata.
-- `POST /memory?key=name&value=Bajrangi` - edit or add memory.
-- `DELETE /memory/name` - forget one memory item.
-- `DELETE /memory?confirm=true` - clear all memory.
-- `GET /history` - recent conversation messages.
-- `GET /commands` - recent command history.
-- `GET /logs` - app logs.
-- `GET /settings` - configuration status.
-- `GET /system` - full system status.
-- `GET /system/processes` - running processes.
-- `GET /system/apps` - installed app shortcuts.
-- `GET /files/search?q=README` - search files.
-- `GET /files/read?path=README.md` - read a supported file.
-- `GET /files/analyze?path=downloads` - analyze a folder.
-- `GET /files/summarize?path=main.py` - summarize a supported file.
-- `GET /research/search?q=FastAPI` - web research summary.
-- `GET /research/news?q=AI` - latest news summary.
-- `GET /research/weather?location=Ahmedabad` - weather summary.
-- `GET /research/webpage?url=https://example.com` - webpage summary.
-- `POST /notes?content=buy milk` - save a note.
-- `GET /notes` - list notes.
-- `POST /tasks?title=finish STAR` - create a task.
-- `GET /tasks` - list tasks.
-- `POST /tasks/1/complete` - complete a task.
-- `POST /reminders?text=drink water&due=in 10 minutes` - create a reminder.
-- `GET /reminders` - list reminders.
-- `GET /reminders/due` - due reminders.
-- `GET /briefing` - daily briefing.
-- `POST /calendar/events?title=Meeting&starts_at=2026-07-18T09:00:00` - create a calendar event.
-- `POST /calendar/events/from-text?text=meeting tomorrow at 9 am` - create event from natural text.
-- `GET /calendar/events` - list calendar events.
-- `GET /calendar/upcoming` - upcoming calendar events.
-- `GET /calendar/agenda?day=today` - today or tomorrow agenda.
-- `POST /calendar/events/1/cancel` - cancel an event.
-- `DELETE /calendar/events/1` - delete an event.
-- `POST /contacts?name=Bajrangi&email=bajrangi@example.com&phone=919999999999` - create a contact.
-- `GET /contacts` - list contacts.
-- `GET /contacts?q=Bajrangi` - search contacts.
-- `GET /contacts/1` - get one contact.
-- `PATCH /contacts/1?email=new@example.com` - update a contact.
-- `DELETE /contacts/1` - delete a contact.
-- `GET /clipboard` - read clipboard text.
-- `POST /clipboard?text=hello` - copy text to clipboard.
-- `POST /clipboard/paste?text=hello` - paste text into the active app.
-- `POST /snippets?name=greeting&content=hello` - save a snippet.
-- `GET /snippets` - list snippets.
-- `GET /snippets?q=greeting` - search snippets.
-- `PATCH /snippets/1?content=updated` - update a snippet.
-- `POST /snippets/1/copy` - copy snippet content to clipboard.
-- `POST /snippets/1/paste` - paste snippet content into the active app.
-- `DELETE /snippets/1` - delete a snippet.
-- `POST /finance/transactions?kind=expense&amount=250&category=food` - save income or expense.
-- `POST /finance/transactions/from-text?kind=expense&text=250 for food note lunch` - save transaction from text.
-- `GET /finance/transactions` - list finance transactions.
-- `GET /finance/summary` - current month income, expense, and balance.
-- `GET /finance/categories` - current month expense categories.
-- `DELETE /finance/transactions/1` - delete a transaction.
-- `POST /health/logs?metric=water_ml&value=500&unit=ml` - save a health log.
-- `POST /health/logs/from-text?kind=water&text=500 ml` - save a health log from text.
-- `GET /health/logs` - list health logs.
-- `GET /health/summary` - today health summary.
-- `DELETE /health/logs/1` - delete a health log.
-- `GET /suggestions` - smart suggestions generated from local usage and activity.
-- `POST /suggestions/feedback?key=log_water&action=dismiss` - save suggestion feedback.
-- `GET /integrations/status` - cloud/mobile/smart-home configuration status.
-- `POST /integrations?name=home&kind=smart_home` - save a planned integration.
-- `GET /integrations` - list saved integrations.
-- `DELETE /integrations/1` - delete a saved integration.
-- `POST /cloud/sync` - write a local cloud-sync snapshot.
-- `GET /mobile` - mobile companion page.
-- `GET /mobile/status` - mobile companion status and wake phrases.
-- `POST /mobile/command?command=open chrome` - run a STAR command from mobile.
-- `POST /mobile/devices/register?device_id=my_phone` - register the Android bridge.
-- `GET /mobile/actions/pull?device_id=my_phone` - bridge pulls queued phone actions.
-- `POST /mobile/actions/1/complete?device_id=my_phone&status=done` - bridge reports action result.
-- `GET /mobile/notifications` - list queued mobile notifications.
-- `POST /mobile/notifications?title=STAR&body=Hello` - queue a mobile notification.
-- `POST /mobile/notifications/1/read` - mark mobile notification read.
-- `DELETE /mobile/notifications/1` - delete mobile notification.
-- `GET /smart-home/status` - Home Assistant status if configured.
-- `POST /smart-home/service?domain=light&service=turn_on&entity_id=light.kitchen` - call a Home Assistant service.
-- `POST /pomodoro/start?minutes=25` - start Pomodoro.
-- `GET /pomodoro` - Pomodoro status.
-- `POST /browser/open?target=openai.com` - open website/search target.
-- `POST /browser/search?q=FastAPI&engine=google` - browser search.
-- `POST /browser/tab/new?target=github.com` - new browser tab.
-- `POST /browser/tab/close` - close current tab.
-- `POST /browser/download?url=https://example.com/file.zip` - download a file.
-- `POST /media/play-pause` - play/pause media.
-- `POST /media/next` - next track.
-- `POST /media/youtube?q=lo-fi` - open YouTube search.
-- `POST /media/spotify` - open Spotify.
-- `POST /whatsapp/send?contact=Name&message=Hello` - send via WhatsApp Web.
-- `GET /whatsapp/url?phone=919999999999&message=Hello` - generate wa.me URL.
-- `GET /coding/analyze` - project analysis.
-- `GET /coding/search?q=FastAPI` - code search.
-- `GET /coding/explain?path=main.py` - explain file structure.
-- `GET /coding/review?path=main.py` - static Python review.
-- `POST /coding/compile` - Python compile check.
-- `GET /git/status` - git status.
-- `GET /git/log?limit=5` - recent commits.
-- `GET /git/diff` - current diff.
-- `GET /git/branch` - current branch.
-- `GET /git/remotes` - remotes.
-- `POST /automations?command=system status&schedule=in 10 minutes` - schedule a command.
-- `POST /automations/workflow?name=morning&steps=system status|show tasks` - create a workflow.
-- `GET /automations` - list automations.
-- `GET /automations/due` - due automations.
-- `POST /automations/run-due` - run due automations.
-- `POST /automations/1/pause` - pause automation.
-- `POST /automations/1/resume` - resume automation.
-- `DELETE /automations/1` - delete automation.
-- `GET /automations/runs` - automation run history.
-- `GET /security` - security and secret configuration status.
-- `POST /security/mode?mode=strict` - set security mode.
-- `GET /security/check?command=send whatsapp message` - classify command risk.
-- `GET /security/audit` - security audit logs.
-- `GET /analytics` - full analytics summary.
-- `GET /analytics/commands` - command totals and success rate.
-- `GET /analytics/daily` - daily command counts.
-- `GET /analytics/tools` - tool usage breakdown.
-- `GET /analytics/errors` - recent errors and warnings.
-- `POST /vision/screenshot` - capture a screenshot.
-- `GET /vision/analyze?path=image.png` - image metadata, brightness, and colors.
-- `GET /vision/ocr?path=image.png` - OCR image text if Tesseract is installed.
-- `GET /vision/qr?path=image.png` - scan QR code.
-- `GET /vision/barcode?path=image.png` - scan barcode if decoder is available.
-- `GET /vision/screen` - screenshot plus image analysis and OCR attempt.
-- `GET /vision/compare?first=a.png&second=b.png` - compare two images.
-- `GET /email/status` - email configuration status.
-- `GET /email/inbox?limit=10&unread_only=false` - list inbox email summaries.
-- `GET /email/search?q=invoice` - search emails.
-- `POST /email/send?to=friend@example.com&subject=Hello&body=Hi` - send email.
-- `POST /email/123/archive` - archive one email by IMAP id.
-- `DELETE /email/123` - delete one email by IMAP id.
-- `POST /confirm` - confirm a pending risky action.
-- `POST /cancel` - cancel a pending risky action.
+| Layer | Best for | URL / setup |
+| --- | --- | --- |
+| Mobile web | Phone browser voice commands and phone-side replies | `http://YOUR-LAPTOP-IP:8000/mobile` |
+| Android Termux bridge | Phone system actions that browsers cannot perform | `mobile_bridge/README.md` |
+
+Run this to see the current phone-ready URL:
+
+```powershell
+.\scripts\status_star.ps1
+```
+
+Open the mobile URL on a phone connected to the same Wi-Fi. Tap `Start Wake`, allow microphone access, then say `hello star`.
+
+For secure Android bridge pairing, open the dashboard, go to `Integrations`, find `Phone Bridge`, click `Rotate Secret`, copy the generated Termux commands, and paste them into Termux.
+
+Phone bridge examples:
+
+| Command | Result |
+| --- | --- |
+| `phone find` | Makes the phone announce/vibrate so you can find it |
+| `phone speak hello bhai` | Speaks on the phone |
+| `phone vibrate` | Vibrates the phone |
+| `phone notify STAR message Check your tasks` | Shows a phone notification |
+| `phone torch on` / `phone torch off` | Controls flashlight |
+| `phone volume 10` / `phone volume max` | Changes media volume |
+| `phone brightness 180` / `phone brightness auto` | Changes brightness |
+| `phone media play pause` / `phone media next` | Sends media key events |
+| `phone clipboard set hello` / `phone clipboard read` | Writes or reads phone clipboard |
+| `phone location` / `phone wifi` / `phone device info` | Queues device information actions |
+
+Android security still applies. Call and SMS commands open Android intents; they do not silently place calls or send messages.
+
+## Dashboard
+
+The dashboard is the control room for STAR.
+
+| Tab | Purpose |
+| --- | --- |
+| Overview | System snapshot, metrics, quick actions, recent commands |
+| Chat | Send natural language prompts or commands |
+| Memory | Inspect and edit remembered facts |
+| Tasks | Tasks, reminders, and scheduling |
+| Voice | Language, wake engine, TTS, repeat/quiet/resume controls |
+| Integrations | Cloud sync, mobile notifications, phone pairing, phone actions, smart home |
+| Suggestions | Self-learning recommendations from usage, health, finance, tasks and errors |
+| Analytics | Command success rate, top tools, daily activity, recent issues |
+| Logs | Recent runtime logs and conversation history |
+
+## Command Cookbook
+
+### Laptop and browser
+
+| Intent | Example |
+| --- | --- |
+| Open app | `open chrome` |
+| Close app | `chrome band karo` |
+| Open folder | `open downloads` |
+| Search web | `google search FastAPI tutorial` |
+| Browser tab | `new tab github.com`, `close tab`, `next tab` |
+| Screen | `take screenshot`, `read screen`, `analyze screen` |
+| System | `system status`, `cpu usage`, `battery status`, `show running processes` |
+| Media | `play music`, `next song`, `open youtube lo-fi music` |
+
+### Memory and personal organization
+
+| Intent | Example |
+| --- | --- |
+| Remember | `remember my city is Ahmedabad` |
+| Recall | `what do you remember` |
+| Forget | `forget my city` |
+| Notes | `add note buy milk`, `show notes` |
+| Tasks | `add task finish STAR dashboard`, `complete task 1` |
+| Reminders | `remind me to drink water in 10 minutes` |
+| Calendar | `add event dentist tomorrow at 5 pm for 30 minutes location clinic` |
+| Agenda | `today agenda`, `tomorrow agenda`, `upcoming events` |
+| Contacts | `add contact Bajrangi email bajrangi@example.com phone +919999999999` |
+
+### Files, research and knowledge
+
+| Intent | Example |
+| --- | --- |
+| Find file | `find file README` |
+| Read file | `read file README.md` |
+| Summarize | `summarize file main.py` |
+| Folder analysis | `analyze folder downloads` |
+| Research | `research Python FastAPI` |
+| Weather/news | `weather Ahmedabad`, `latest news AI` |
+| Webpage | `summarize webpage https://example.com` |
+
+### Finance, health and productivity
+
+| Intent | Example |
+| --- | --- |
+| Expense | `add expense 250 for food note lunch` |
+| Income | `add income 5000 for salary` |
+| Finance summary | `finance summary`, `monthly expenses`, `expense categories` |
+| Health | `log water 500 ml`, `log sleep 7 hours`, `log workout 30 minutes running` |
+| Wellness | `health summary`, `show health logs`, `log mood happy` |
+| Focus | `start pomodoro 25`, `pomodoro status` |
+
+### Integrations and automation
+
+| Intent | Example |
+| --- | --- |
+| Email | `email test`, `read emails`, `search emails invoice` |
+| WhatsApp | `whatsapp status`, `send whatsapp to Bajrangi message hello` |
+| Cloud | `cloud sync now` |
+| Mobile | `send mobile notification STAR message Check your tasks` |
+| Smart home | `smart home turn on light.kitchen` then `confirm` |
+| Suggestions | `smart suggestions`, `dismiss suggestion log_water` |
+| Coding | `analyze project`, `search code FastAPI`, `run compile check` |
+| Git | `git status`, `git diff`, `git commit update STAR features` then `confirm` |
+
+## API Surface
+
+Core routes:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /dashboard` | Web dashboard |
+| `GET /mobile` | Mobile companion page |
+| `GET /ask-star?q=...` | Run a STAR command |
+| `GET /health` | Health and feature stats |
+| `GET /settings` | Runtime settings and integration state |
+| `GET /voice/status` | Voice state, settings and last reply |
+| `POST /voice/settings` | Update voice settings |
+| `POST /voice/quiet` / `POST /voice/resume` / `POST /voice/sleep` | Voice mode controls |
+
+Mobile and bridge routes:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /mobile/status` | Mobile status and wake phrases |
+| `GET /mobile/pairing` | Pairing data and Termux command block |
+| `POST /mobile/pairing/regenerate` | Rotate mobile shared secret |
+| `POST /mobile/command?command=...` | Run STAR from mobile without laptop TTS |
+| `POST /mobile/devices/register?device_id=...` | Register Android bridge |
+| `GET /mobile/devices` | List connected bridge devices |
+| `POST /mobile/actions?action=...` | Queue a phone action |
+| `GET /mobile/actions/pull?device_id=...` | Phone bridge pulls queued actions |
+| `POST /mobile/actions/{id}/complete` | Phone bridge reports result |
+
+Productivity and integrations:
+
+| Route group | Includes |
+| --- | --- |
+| `/memory`, `/history`, `/commands`, `/logs` | Personal memory and audit trail |
+| `/tasks`, `/reminders`, `/calendar` | Personal productivity |
+| `/contacts`, `/notes`, `/snippets` | Saved personal data |
+| `/finance`, `/health` | Trackers and summaries |
+| `/integrations`, `/cloud/sync`, `/smart-home` | External integration layer |
+| `/analytics`, `/suggestions` | Usage intelligence and smart recommendations |
+
+## Project Layout
+
+```text
+.
+|-- main.py                       FastAPI backend and command router
+|-- wake_word.py                  Wake listener and conversation loop
+|-- star_voice.py                 Voice settings, wake phrases, quiet/sleep logic
+|-- star_storage.py               SQLite schema and persistence helpers
+|-- star_integrations.py          Cloud, mobile bridge, smart home helpers
+|-- web/                          Dashboard and mobile web UI
+|-- mobile_bridge/                Android Termux bridge and setup guide
+|-- scripts/                      Start, stop, status and startup scripts
+|-- requirements.txt              Python dependencies
+`-- star.db                       Local SQLite database
+```
+
+## Safety Model
+
+STAR is intentionally local-first. The backend runs on your laptop, memory stays in SQLite, and high-risk actions use confirmation gates. Voice commands cannot stop the backend. Mobile pairing can use a shared secret, and the dashboard can rotate that secret.
+
+Some integrations still depend on external accounts or services:
+
+| Feature | Needs |
+| --- | --- |
+| Groq intelligence | `GROQ_API_KEY` |
+| Email | Email address and app password |
+| Picovoice wake word | Optional `PICOVOICE_ACCESS_KEY` |
+| Smart home | Home Assistant URL and token |
+| Android bridge | Termux and Termux:API installed on the phone |
 
 ## Notes
 
-- WhatsApp and Instagram automation depend on the current web UI and may need selector updates over time.
-- Memory, history, commands, and logs are saved locally in `star.db`; this file is ignored by git because it can contain personal data.
-- If `star_memory.json` exists from an older version, STAR imports it into SQLite on startup.
-- PDF reading needs `pypdf` or `PyPDF2`; OCR will need an OCR engine in a later batch.
-- OCR uses `pytesseract`, but Windows also needs the Tesseract OCR engine installed and available on PATH.
-- Email defaults to Gmail IMAP/SMTP. For Gmail, enable IMAP and use an app password in `.env`; never paste email passwords into chat.
-- Email send can use a saved contact name if the contact has an email address.
-- Clipboard paste actions type into the currently active app, so STAR asks for confirmation in normal/strict security modes.
-- Health logs are personal tracking only, not medical advice.
-- Multilingual support uses local Hinglish/Hindi mappings first; if Groq is configured, STAR can normalize broader language commands before routing.
-- Smart-home control uses Home Assistant env keys `HOME_ASSISTANT_URL` and `HOME_ASSISTANT_TOKEN`; device actions require confirmation.
-- Cloud sync writes local snapshots to `CLOUD_SYNC_DIR` or `cloud_sync/`; mobile support exposes a notification queue for a future app/client.
-- WhatsApp send/search requires WhatsApp Web login and may need selector updates if WhatsApp changes its UI.
-- Security modes: `relaxed` confirms only highest-risk actions, `normal` confirms messaging/download/automation/power/git write actions, and `strict` confirms every recognized risky action.
-- Keep `.env` private.
+The Android bridge gives useful phone control, but it does not bypass Android permission rules. For deeper phone automation, the next step is a native Android companion with an Accessibility service and explicit user-granted permissions.
+
+Cloud sync currently writes local snapshots to `CLOUD_SYNC_DIR` or `cloud_sync/`. Full Google Drive, OneDrive or Dropbox sync can be added on top of the same integration layer.
