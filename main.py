@@ -3543,7 +3543,8 @@ def voice_resume():
 def voice_wake():
     settings = star_voice.get_settings()
     if star_voice.is_voice_quiet(settings):
-        return {"status": "quiet", "spoken": False}
+        star_voice.set_voice_quiet(False)
+        settings = star_voice.get_settings()
     language = settings.get("response_language", "auto")
     if language == "hindi":
         reply = "Haan, boliye."

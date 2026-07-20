@@ -99,6 +99,15 @@ def recognize_with_fallback(audio, settings, strip_wake=True):
 def handle_spoken_command(command, used_language=None):
     global conversation_mode
 
+    raw_command = star_voice.normalize_text(command)
+    if star_voice.detect_wake_phrase(raw_command) and not star_voice.command_after_wake(raw_command):
+        print("Wake phrase repeated in conversation mode.", flush=True)
+        response = call_star("/voice/wake", method="post")
+        if response is not None:
+            print("Wake acknowledgement sent.", flush=True)
+        time.sleep(WAKE_REPLY_SETTLE_SECONDS)
+        return
+
     command = star_voice.clean_transcript(command)
     if not command:
         return
@@ -178,7 +187,7 @@ def listen_continuous():
                     return
                 continue
 
-        command, used_language = recognize_with_fallback(audio, settings, strip_wake=True)
+        command, used_language = recognize_with_fallback(audio, settings, strip_wake=False)
         if not command:
             idle_misses += 1
             if idle_misses >= 2:
@@ -278,6 +287,9 @@ def listen_for_picovoice_wake():
                 stream.stop_stream()
                 stream.close()
                 stream = None
+                response = call_star("/voice/wake", method="post")
+                if response is not None:
+                    print("Wake acknowledgement sent.", flush=True)
                 time.sleep(WAKE_REPLY_SETTLE_SECONDS)
                 listen_continuous()
                 stream = open_stream()
