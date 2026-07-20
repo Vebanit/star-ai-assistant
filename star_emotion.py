@@ -69,6 +69,16 @@ def fallback_adapt(reply, user_text):
     return reply
 
 
+def clean_reply_text(text):
+    clean = str(text or "").strip().strip('"')
+    clean = re.sub(r"\s+", " ", clean)
+    clean = clean.replace(" ,", ",").replace(" .", ".").replace(" !", "!")
+    clean = clean.replace(", !", "!").replace(", ?", "?").replace(",!", "!").replace(",?", "?")
+    clean = re.sub(r"([.!?]){2,}", r"\1", clean)
+    clean = re.sub(r"\s+([,.!?])", r"\1", clean)
+    return clean.strip()
+
+
 def force_english_reply(reply):
     text = str(reply or "").strip()
     if not text:
@@ -90,8 +100,7 @@ def force_english_reply(reply):
     clean = text
     for pattern, replacement in replacements:
         clean = re.sub(pattern, replacement, clean, flags=re.IGNORECASE)
-    clean = re.sub(r"\s+", " ", clean).strip()
-    clean = clean.replace(" ,", ",").replace(" .", ".")
+    clean = clean_reply_text(clean)
     return clean or text
 
 
@@ -167,8 +176,8 @@ STAR reply:
             max_tokens=140,
             messages=[{"role": "user", "content": prompt}],
         )
-        adapted = res.choices[0].message.content.strip().strip('"')
-        return adapted or fallback_adapt(clean_reply, user_text)
+        adapted = clean_reply_text(res.choices[0].message.content)
+        return adapted or clean_reply_text(fallback_adapt(clean_reply, user_text))
     except Exception as exc:
         storage.add_log("warning", "emotion_reply_adapt_failed", str(exc))
-        return fallback_adapt(clean_reply, user_text)
+        return clean_reply_text(fallback_adapt(clean_reply, user_text))

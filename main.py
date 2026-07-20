@@ -141,6 +141,38 @@ def adapt_reply_for_context(reply, user_text=None):
     return ADAPTED_REPLY_CACHE[key]
 
 
+def looks_incomplete_voice_fragment(text):
+    clean = star_voice.normalize_text(text)
+    if not clean:
+        return False
+    if clean in {"what is", "what", "kya", "kaise", "why", "kyu", "tell me", "bata"}:
+        return True
+    return clean.endswith((" what is", " kya", " kaise", " bata"))
+
+
+def handle_natural_conversation(text):
+    clean = star_voice.normalize_text(text)
+    if not clean:
+        return None
+
+    if any(phrase in clean for phrase in ["proper baat kar", "normal baat kar", "human jaise", "human jaisi"]):
+        return "Haan bhai, ab seedha normal baat kar raha hoon. Tu apni baat poori bol, main dhang se jawab dunga."
+
+    if any(phrase in clean for phrase in ["sun raha", "sun rha", "sun rahe", "are you listening", "can you hear"]):
+        return "Haan bhai, main sun raha hoon. Bol, kya karna hai?"
+
+    if any(phrase in clean for phrase in ["kaise ho", "kaisa hai", "kesa hai", "how are you"]):
+        return "Main badhiya hoon bhai. Tu bata, kya chal raha hai?"
+
+    if clean in {"hello", "hello star", "hi", "hey", "star"}:
+        return "Haan bhai, bol."
+
+    if any(phrase in clean for phrase in ["jawab nahi", "reply nahi", "response nahi"]):
+        return "Samjha bhai. Ab main zyada dhyan se sununga; tu ek baar poori baat bol."
+
+    return None
+
+
 def speak(text):
     global current_process, SPEAKING_SIGNAL_UNTIL
 
@@ -3261,6 +3293,16 @@ def ask_star(user_text):
             storage.add_log("info", "voice_quiet_ignored", {"command": text})
             return ""
 
+        if looks_incomplete_voice_fragment(text):
+            reply = "Bhai sentence cut gaya, ek baar poora sawal fir se bol."
+            speak(reply)
+            return record_interaction(text, "voice", "incomplete", reply, adapt=False)
+
+        natural_reply = handle_natural_conversation(text)
+        if natural_reply:
+            speak(natural_reply)
+            return record_interaction(text, "conversation", "ok", natural_reply, adapt=False)
+
         pending_media_reply = handle_pending_media_request(text)
         if pending_media_reply:
             speak(pending_media_reply)
@@ -3340,13 +3382,15 @@ Internet data:
 {internet_data}
 
 Rules:
-Reply short and natural.
+Reply short, natural, and conversational like a real voice assistant.
 {star_voice.response_language_instruction()}
 Detect the user's emotional tone and match it with empathy.
 If the user is excited, sound excited. If frustrated, be calm and helpful. If sad, be gentle.
 For Hinglish, reply like a real Indian friend: simple, warm, casual, not formal textbook Hindi.
 For Hindi, use normal spoken Hindi, not literal translation.
 Avoid robotic words like "sahayata pradan", "vartamaan", "kripya" unless the user is very formal.
+If the user's words look incomplete or unclear, ask one quick follow-up instead of guessing.
+Do not say "as an AI" or explain internal routing.
 
 User: {text}
 """

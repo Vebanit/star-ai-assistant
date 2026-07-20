@@ -47,7 +47,7 @@ def should_fallback_wake(audio, settings):
     stats = audio_stats(audio)
     energy = int(float(settings.get("voice_energy_threshold", "300")))
     now = time.time()
-    is_short_phrase = 0.35 <= stats["duration"] <= 2.4
+    is_short_phrase = 0.35 <= stats["duration"] <= 4.8
     is_clear_voice = (
         stats["rms"] >= max(240, energy * 0.8) and stats["peak"] >= max(2400, energy * 7)
     ) or stats["peak"] >= max(3800, energy * 11)
@@ -77,6 +77,29 @@ def call_star(path, params=None, method="get"):
     except requests.RequestException as exc:
         print("STAR backend request failed:", exc, flush=True)
         return None
+
+
+def star_is_speaking():
+    response = call_star("/voice/status")
+    if response is None:
+        return False
+    try:
+        return bool(response.json().get("is_speaking"))
+    except ValueError:
+        return False
+
+
+def wait_for_star_to_finish_speaking(max_seconds=12):
+    started = time.time()
+    saw_speech = False
+    while time.time() - started < max_seconds:
+        if star_is_speaking():
+            saw_speech = True
+            time.sleep(0.2)
+            continue
+        if saw_speech:
+            time.sleep(0.25)
+        return
 
 
 def recognize_with_fallback(audio, settings, strip_wake=True):
@@ -168,6 +191,7 @@ def listen_continuous():
 
     idle_misses = 0
     while conversation_mode:
+        wait_for_star_to_finish_speaking()
         settings = apply_voice_settings()
         with sr.Microphone() as source:
             print("Listening Bajrangi...", flush=True)
@@ -187,6 +211,11 @@ def listen_continuous():
                     return
                 continue
 
+        if star_is_speaking():
+            print("Ignoring mic audio while STAR is speaking.", flush=True)
+            wait_for_star_to_finish_speaking()
+            continue
+
         command, used_language = recognize_with_fallback(audio, settings, strip_wake=False)
         if not command:
             idle_misses += 1
@@ -197,6 +226,7 @@ def listen_continuous():
             continue
         idle_misses = 0
         handle_spoken_command(command, used_language)
+        wait_for_star_to_finish_speaking()
 
 
 def listen_for_speech_wake():
@@ -213,6 +243,11 @@ def listen_for_speech_wake():
                 audio = recognizer.listen(source, timeout=5, phrase_time_limit=4)
             except sr.WaitTimeoutError:
                 continue
+
+        if star_is_speaking():
+            print("Ignoring wake audio while STAR is speaking.", flush=True)
+            wait_for_star_to_finish_speaking()
+            continue
 
         transcript, used_language = recognize_with_fallback(audio, settings, strip_wake=False)
         if not transcript:
@@ -310,8 +345,6 @@ def main():
             return
         except Exception as exc:
             print("Picovoice wake failed:", exc, flush=True)
-            if engine == "picovoice":
-                raise
             print("Falling back to free keyless speech wake mode.", flush=True)
 
     listen_for_speech_wake()
