@@ -89,6 +89,16 @@ def star_is_speaking():
         return False
 
 
+def star_runtime_enabled():
+    response = call_star("/voice/status")
+    if response is None:
+        return True
+    try:
+        return bool(response.json().get("runtime_enabled", True))
+    except ValueError:
+        return True
+
+
 def wait_for_star_to_finish_speaking(max_seconds=12):
     started = time.time()
     saw_speech = False
@@ -100,6 +110,10 @@ def wait_for_star_to_finish_speaking(max_seconds=12):
         if saw_speech:
             time.sleep(0.25)
         return
+
+
+def set_listening_state(active, mode="idle"):
+    call_star("/voice/listening", params={"active": str(bool(active)).lower(), "mode": mode}, method="post")
 
 
 def recognize_with_fallback(audio, settings, strip_wake=True):
@@ -174,10 +188,10 @@ def handle_spoken_command(command, used_language=None):
     confirmation = star_voice.confirmation_intent(command)
     if confirmation:
         print("Confirmation intent:", confirmation, flush=True)
-        call_star("/ask-star", params={"q": confirmation})
+        call_star("/ask-star", params={"q": confirmation, "source": "voice"})
         return
 
-    response = call_star("/ask-star", params={"q": command})
+    response = call_star("/ask-star", params={"q": command, "source": "voice"})
     if response is not None:
         try:
             reply = response.json().get("reply", "")
@@ -191,9 +205,14 @@ def listen_continuous():
 
     idle_misses = 0
     while conversation_mode:
+        if not star_runtime_enabled():
+            print("STAR runtime is off. Leaving command listener.", flush=True)
+            conversation_mode = False
+            return
         wait_for_star_to_finish_speaking()
         settings = apply_voice_settings()
         with sr.Microphone() as source:
+            set_listening_state(True, "command")
             print("Listening Bajrangi...", flush=True)
             recognizer.adjust_for_ambient_noise(source, duration=0.12)
 
@@ -204,12 +223,15 @@ def listen_continuous():
                     phrase_time_limit=int(float(settings.get("voice_phrase_time_limit", "6"))),
                 )
             except sr.WaitTimeoutError:
+                set_listening_state(False, "idle")
                 idle_misses += 1
                 if idle_misses >= 2:
                     print("No command heard. Returning to wake mode.", flush=True)
                     conversation_mode = False
                     return
                 continue
+            finally:
+                set_listening_state(False, "idle")
 
         if star_is_speaking():
             print("Ignoring mic audio while STAR is speaking.", flush=True)
@@ -236,13 +258,20 @@ def listen_for_speech_wake():
     print("Say: hello star, hey star, or star.", flush=True)
 
     while True:
+        if not star_runtime_enabled():
+            print("STAR runtime is off. Wake listener exiting.", flush=True)
+            return
         settings = apply_voice_settings()
         with sr.Microphone() as source:
+            set_listening_state(True, "wake")
             recognizer.adjust_for_ambient_noise(source, duration=0.1)
             try:
                 audio = recognizer.listen(source, timeout=5, phrase_time_limit=4)
             except sr.WaitTimeoutError:
+                set_listening_state(False, "idle")
                 continue
+            finally:
+                set_listening_state(False, "idle")
 
         if star_is_speaking():
             print("Ignoring wake audio while STAR is speaking.", flush=True)
@@ -251,14 +280,6 @@ def listen_for_speech_wake():
 
         transcript, used_language = recognize_with_fallback(audio, settings, strip_wake=False)
         if not transcript:
-            if should_fallback_wake(audio, settings):
-                print("Fallback wake from short clear voice audio.", flush=True)
-                conversation_mode = True
-                response = call_star("/voice/wake", method="post")
-                if response is not None:
-                    print("Wake acknowledgement sent.", flush=True)
-                time.sleep(WAKE_REPLY_SETTLE_SECONDS)
-                listen_continuous()
             continue
 
         phrase = star_voice.detect_wake_phrase(transcript, settings=settings)
@@ -312,6 +333,9 @@ def listen_for_picovoice_wake():
         stream = open_stream()
         print("STAR is listening with Picovoice wake word...", flush=True)
         while True:
+            if not star_runtime_enabled():
+                print("STAR runtime is off. Picovoice listener exiting.", flush=True)
+                return
             pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
             pcm = struct.unpack_from("h" * porcupine.frame_length, pcm)
 
@@ -336,6 +360,10 @@ def listen_for_picovoice_wake():
 
 
 def main():
+    if not star_runtime_enabled():
+        print("STAR runtime is off. Wake listener not started.", flush=True)
+        return
+
     settings = apply_voice_settings()
     engine = str(settings.get("wake_engine", "auto")).lower()
 

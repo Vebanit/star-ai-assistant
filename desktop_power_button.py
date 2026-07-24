@@ -72,6 +72,7 @@ class StarPowerButton:
 
         self.quiet = None
         self.speaking = False
+        self.listening = False
         self.visible = True
         self.phase = 0
         self.drag_start = None
@@ -117,17 +118,22 @@ class StarPowerButton:
     def set_waiting(self):
         self.quiet = None
         self.speaking = False
+        self.listening = False
         self.state_label.config(text="WAITING", fg="#9b5d2e")
         self.button.config(text="Server...", state="disabled", bg="#9b5d2e")
 
-    def set_state(self, quiet, speaking=False):
+    def set_state(self, quiet, speaking=False, listening=False):
         self.quiet = bool(quiet)
         self.speaking = bool(speaking) and not self.quiet
+        self.listening = bool(listening) and not self.quiet and not self.speaking
         if self.quiet:
             self.state_label.config(text="OFF", fg="#b42318")
             self.button.config(text="Turn On", state="normal", bg="#b42318", activebackground="#8f1c13")
         elif self.speaking:
             self.state_label.config(text="SPEAKING", fg="#56f0c6")
+            self.button.config(text="Turn Off", state="normal", bg="#16745f", activebackground="#125f4f")
+        elif self.listening:
+            self.state_label.config(text="LISTENING", fg="#7bdcff")
             self.button.config(text="Turn Off", state="normal", bg="#16745f", activebackground="#125f4f")
         else:
             self.state_label.config(text="ON", fg="#16745f")
@@ -168,6 +174,8 @@ class StarPowerButton:
         self.phase = (self.phase + 1) % 1000
         if self.speaking:
             self.draw_speaking_wave()
+        elif self.listening:
+            self.draw_idle_orb("#7bdcff")
         elif self.quiet:
             self.draw_idle_orb("#b42318")
         elif self.quiet is None:
@@ -180,9 +188,13 @@ class StarPowerButton:
         try:
             status = self.request_json("/voice/status")
             settings = status.get("settings", {})
-            quiet = checked(settings.get("voice_quiet", "false"))
+            quiet = not checked(status.get("runtime_enabled", not checked(settings.get("voice_quiet", "false"))))
             self.apply_visibility(checked(status.get("desktop_button_visible", True)))
-            self.set_state(quiet, speaking=checked(status.get("is_speaking", False)))
+            self.set_state(
+                quiet,
+                speaking=checked(status.get("is_speaking", False)),
+                listening=checked(status.get("is_listening", False)),
+            )
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
             self.set_waiting()
         self.root.after(POLL_MS, self.refresh)
@@ -190,7 +202,7 @@ class StarPowerButton:
     def toggle(self):
         if self.quiet is None:
             return
-        endpoint = "/voice/resume" if self.quiet else "/voice/quiet"
+        endpoint = "/runtime/on" if self.quiet else "/runtime/off"
         try:
             self.request_json(endpoint, method="POST")
             self.set_state(not self.quiet)

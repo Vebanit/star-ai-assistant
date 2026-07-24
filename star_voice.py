@@ -6,7 +6,7 @@ import star_storage as storage
 DEFAULT_SETTINGS = {
     "voice_mode": "conversation",
     "voice_language": "auto",
-    "response_language": "hinglish",
+    "response_language": "english",
     "voice_primary_language": "en-IN",
     "voice_timeout": "5",
     "voice_phrase_time_limit": "8",
@@ -15,7 +15,7 @@ DEFAULT_SETTINGS = {
     "voice_spoken_confirmations": "true",
     "voice_quiet": "false",
     "wake_engine": "speech",
-    "wake_phrases": "hello star,hello,hey star,ok star,okay star,chal star,star,sitar,sitara,hello sir,hello sar,yellow star,halo star,helo star,ok sar,ok sir",
+    "wake_phrases": "hey star,hello star,star",
     "tts_voice": "en-IN-PrabhatNeural",
     "tts_rate": "+5%",
     "tts_pitch": "+0Hz",

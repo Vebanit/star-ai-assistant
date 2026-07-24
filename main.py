@@ -4,6 +4,7 @@ import difflib
 import glob
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -58,6 +59,10 @@ BASE_DIR = Path(__file__).resolve().parent
 LEGACY_MEMORY_FILE = BASE_DIR / "star_memory.json"
 SPEAKER_FILE = BASE_DIR / "speaker.py"
 WEB_DIR = BASE_DIR / "web"
+RUNTIME_DIR = BASE_DIR / "runtime"
+WAKE_PID_FILE = RUNTIME_DIR / "wake_word.pid"
+WAKE_LOG_FILE = RUNTIME_DIR / "wake_word.log"
+WAKE_ERROR_LOG_FILE = RUNTIME_DIR / "wake_word.err.log"
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -68,9 +73,11 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY")) if os.getenv("GROQ_API_KEY") el
 current_process = None
 PENDING_CONFIRMATION = None
 PENDING_MEDIA_REQUEST = None
+PENDING_WHATSAPP_MESSAGE = None
 SPEECH_CONTEXT = None
 ADAPTED_REPLY_CACHE = {}
 SPEAKING_SIGNAL_UNTIL = 0
+LISTENING_STATE = {"active": False, "mode": "idle", "updated_at": 0}
 SUPPRESS_TTS = contextvars.ContextVar("SUPPRESS_TTS", default=False)
 
 
@@ -156,25 +163,25 @@ def handle_natural_conversation(text):
         return None
 
     if any(phrase in clean for phrase in ["proper baat kar", "normal baat kar", "human jaise", "human jaisi"]):
-        return "Haan bhai, ab seedha normal baat kar raha hoon. Tu apni baat poori bol, main dhang se jawab dunga."
+        return "Yes, I am here. Say the full thing naturally, and I will answer properly."
 
     if any(phrase in clean for phrase in ["sun raha", "sun rha", "sun rahe", "are you listening", "can you hear"]):
-        return "Haan bhai, main sun raha hoon. Bol, kya karna hai?"
+        return "Yes, I am listening. Tell me what you want me to do."
 
     if any(phrase in clean for phrase in ["kaise ho", "kaisa hai", "kesa hai", "how are you"]):
-        return "Main badhiya hoon bhai. Tu bata, kya chal raha hai?"
+        return "I am good. Tell me, what is going on?"
 
     if any(phrase in clean for phrase in ["what are you doing", "kya kar rahe ho", "kya kar rha hai", "kya kar raha hai", "kya chal raha"]):
-        return "Bas bhai, main yahin hoon. Teri baat sun raha hoon aur jo bolega woh handle kar dunga."
+        return "I am right here, listening to you and ready to handle whatever you ask."
 
     if any(phrase in clean for phrase in ["tum kya kar sakte ho", "what can you do", "kya kya kar sakta"]):
-        return "Main baat kar sakta hoon, info de sakta hoon, apps khol sakta hoon, YouTube chala sakta hoon, aur laptop ke kaafi kaam voice se karwa sakta hoon."
+        return "I can talk with you, answer questions, open apps, play YouTube, send WhatsApp messages, and control many laptop tasks by voice."
 
     if clean in {"hello", "hello star", "hi", "hey", "star"}:
-        return "Haan bhai, bol."
+        return "Yes, I am listening."
 
     if any(phrase in clean for phrase in ["jawab nahi", "reply nahi", "response nahi"]):
-        return "Samjha bhai. Ab main zyada dhyan se sununga; tu ek baar poori baat bol."
+        return "I understand. Say the full sentence once more, and I will respond properly."
 
     return None
 
@@ -238,6 +245,116 @@ def desktop_button_visible():
 def set_desktop_button_visible(visible):
     storage.set_setting("desktop_button_visible", "true" if visible else "false")
     return desktop_button_visible()
+
+
+def update_listening_state(active, mode="idle"):
+    LISTENING_STATE["active"] = bool(active)
+    LISTENING_STATE["mode"] = str(mode or "idle")
+    LISTENING_STATE["updated_at"] = time.time()
+    return LISTENING_STATE.copy()
+
+
+def listening_state():
+    state = LISTENING_STATE.copy()
+    if state["active"] and time.time() - float(state.get("updated_at") or 0) > 15:
+        state = update_listening_state(False, "idle")
+    return state
+
+
+def runtime_enabled():
+    return storage.get_setting("star_runtime_enabled", "true").lower() != "false"
+
+
+def set_runtime_enabled(enabled):
+    storage.set_setting("star_runtime_enabled", "true" if enabled else "false")
+    return runtime_enabled()
+
+
+def read_pid(pid_file):
+    try:
+        return int(pid_file.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def process_is_running(pid):
+    if not pid:
+        return False
+    try:
+        process = psutil.Process(pid)
+        return process.is_running()
+    except psutil.Error:
+        return False
+
+
+def wake_listener_running():
+    pid = read_pid(WAKE_PID_FILE)
+    running = process_is_running(pid)
+    if pid and not running:
+        try:
+            WAKE_PID_FILE.unlink()
+        except OSError:
+            pass
+    return running
+
+
+def stop_wake_listener():
+    pid = read_pid(WAKE_PID_FILE)
+    stopped = False
+    if pid and process_is_running(pid):
+        try:
+            process = psutil.Process(pid)
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except psutil.TimeoutExpired:
+                process.kill()
+            stopped = True
+        except psutil.Error as exc:
+            storage.add_log("warning", "wake_listener_stop_failed", str(exc))
+    try:
+        WAKE_PID_FILE.unlink()
+    except OSError:
+        pass
+    update_listening_state(False, "idle")
+    return stopped
+
+
+def start_wake_listener():
+    if not runtime_enabled():
+        return False
+    if wake_listener_running():
+        return True
+
+    RUNTIME_DIR.mkdir(exist_ok=True)
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    stdout_handle = WAKE_LOG_FILE.open("ab")
+    stderr_handle = WAKE_ERROR_LOG_FILE.open("ab")
+    try:
+        process = subprocess.Popen(
+            [sys.executable, "-u", str(BASE_DIR / "wake_word.py")],
+            cwd=str(BASE_DIR),
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            creationflags=creationflags,
+        )
+    except Exception as exc:
+        storage.add_log("error", "wake_listener_start_failed", str(exc))
+        return False
+    finally:
+        stdout_handle.close()
+        stderr_handle.close()
+
+    WAKE_PID_FILE.write_text(str(process.pid), encoding="utf-8")
+    return True
+
+
+def runtime_status_payload():
+    return {
+        "runtime_enabled": runtime_enabled(),
+        "wake_listener_running": wake_listener_running(),
+        "wake_pid": read_pid(WAKE_PID_FILE),
+    }
 
 
 # ------------------- BROWSER AUTOMATION -------------------
@@ -1105,21 +1222,97 @@ def handle_browser_command(command):
 
 def parse_whatsapp_send(text):
     lower_text = text.lower()
+    contact_only_markers = [
+        "whatsapp par",
+        "whatsapp pe",
+        "whatsapp pr",
+        "whatsapp per",
+        "whatsapp to",
+        "send whatsapp to",
+        "message whatsapp to",
+    ]
+
+    def clean_contact(raw):
+        value = str(raw or "").strip()
+        value = re.sub(r"\b(whatsapp|message|msg|kar|karo|bhejo|send|to|par|pe|pr|per)\b", " ", value, flags=re.IGNORECASE)
+        value = re.sub(r"\s+ko\s*$", " ", value, flags=re.IGNORECASE)
+        value = re.sub(r"\s+", " ", value).strip(" ,-")
+        return value
+
     if " message " in lower_text:
         index = lower_text.index(" message ")
         before = text[:index]
         message = text[index + len(" message "):]
+    elif " msg " in lower_text:
+        index = lower_text.index(" msg ")
+        before = text[:index]
+        message = text[index + len(" msg "):]
     elif " saying " in lower_text:
         index = lower_text.index(" saying ")
         before = text[:index]
         message = text[index + len(" saying "):]
+    elif " bolo " in lower_text:
+        index = lower_text.index(" bolo ")
+        before = text[:index]
+        message = text[index + len(" bolo "):]
+    elif " bhejo " in lower_text:
+        index = lower_text.index(" bhejo ")
+        before = text[:index]
+        message = text[index + len(" bhejo "):]
     else:
+        contact = None
+        for marker in contact_only_markers:
+            if marker in lower_text:
+                start = lower_text.index(marker) + len(marker)
+                contact = text[start:].strip()
+                break
+        if not contact and "whatsapp" in lower_text and " ko " in lower_text:
+            before_whatsapp = text[:lower_text.index("whatsapp")].strip()
+            if " ko " in before_whatsapp.lower():
+                contact = before_whatsapp.rsplit(" ko ", 1)[0].strip()
+        if contact:
+            contact = clean_contact(contact)
+            return contact, None
         return None
 
     contact = text_after_any(before, ["send whatsapp to", "whatsapp message to", "send message to"]).strip()
+    if not contact:
+        contact = text_after_any(before, ["whatsapp par", "whatsapp pe", "whatsapp pr", "whatsapp per", "whatsapp to"]).strip()
+    if not contact and " ko " in before.lower():
+        contact = before.rsplit(" ko ", 1)[0].replace("whatsapp", "").strip()
+    contact = clean_contact(contact)
+    if message.strip().lower() in {"kar", "karo", "karna", "kr", "do"}:
+        return (contact, None) if contact else None
     if not contact or not message.strip():
         return None
     return contact, message.strip()
+
+
+def handle_pending_whatsapp_message(command):
+    global PENDING_WHATSAPP_MESSAGE
+
+    if not PENDING_WHATSAPP_MESSAGE:
+        return None
+    if star_voice.confirmation_intent(command) == "cancel":
+        contact = PENDING_WHATSAPP_MESSAGE.get("contact", "")
+        PENDING_WHATSAPP_MESSAGE = None
+        return f"Cancelled WhatsApp message to {contact}."
+
+    contact = PENDING_WHATSAPP_MESSAGE.get("contact", "").strip()
+    PENDING_WHATSAPP_MESSAGE = None
+    if not contact:
+        return None
+
+    message = command.strip()
+    if not message:
+        PENDING_WHATSAPP_MESSAGE = {"contact": contact}
+        return f"What should I send to {contact}?"
+
+    return security_gate(
+        f"send whatsapp to {contact} message {message}",
+        "whatsapp",
+        lambda: run_tool("whatsapp", f"send whatsapp to {contact} message {message}"),
+    )
 
 
 def handle_whatsapp_command(command):
@@ -1142,6 +1335,11 @@ def handle_whatsapp_command(command):
     parsed = parse_whatsapp_send(text)
     if parsed:
         contact, message = parsed
+        if not message:
+            global PENDING_WHATSAPP_MESSAGE
+            PENDING_WHATSAPP_MESSAGE = {"contact": contact}
+            return f"What should I send to {contact}?"
+
         driver = None
         try:
             driver = create_chrome_driver()
@@ -3279,7 +3477,7 @@ def record_interaction(user_text, tool, status, reply, adapt=True):
     return reply
 
 
-def ask_star(user_text):
+def ask_star(user_text, source="api"):
     global SPEECH_CONTEXT
     text = user_text.strip()
     lower_text = text.lower()
@@ -3291,6 +3489,11 @@ def ask_star(user_text):
     SPEECH_CONTEXT = text
 
     try:
+        if source == "voice" and not runtime_enabled():
+            storage.add_command(text, "runtime", "off", "")
+            storage.add_log("info", "runtime_off_voice_ignored", {"command": text})
+            return ""
+
         if any(phrase in lower_text for phrase in ["stop server", "close server", "shutdown server", "kill server", "stop backend", "close backend"]):
             reply = "STAR server stays on in the background. Say stop to stop my speech, or sleep to stop listening until the wake word."
             speak(reply)
@@ -3298,31 +3501,36 @@ def ask_star(user_text):
 
         if star_voice.is_resume_command(text):
             star_voice.set_voice_quiet(False)
-            reply = "Theek hai bhai, ab main baat kar sakta hoon."
+            reply = "Okay, I can talk now."
             speak(reply)
             return record_interaction(text, "voice", "ok", reply, adapt=False)
 
         if star_voice.is_exit_listening_command(text):
             star_voice.set_voice_quiet(False)
             stop_speaking()
-            reply = "Theek hai bhai, main sleep mode me hoon. Hello star bolo, fir main sununga."
+            reply = "Okay, I am in sleep mode. Say hello star when you want me to listen again."
             return record_interaction(text, "voice", "sleep", reply, adapt=False)
 
         if star_voice.is_quiet_command(text):
             star_voice.set_voice_quiet(True)
             stop_speaking()
-            reply = "Theek hai, main chup ho gaya. Jab bolna ho, say ok star you can talk."
+            reply = "Okay, I am quiet now. Say hello star when you want me back."
             return record_interaction(text, "voice", "ok", reply, adapt=False)
 
-        if star_voice.is_voice_quiet():
+        if source == "voice" and star_voice.is_voice_quiet():
             storage.add_command(text, "voice", "quiet", "")
             storage.add_log("info", "voice_quiet_ignored", {"command": text})
             return ""
 
         if looks_incomplete_voice_fragment(text):
-            reply = "Bhai sentence cut gaya, ek baar poora sawal fir se bol."
+            reply = "Your sentence got cut off. Please say the full question again."
             speak(reply)
             return record_interaction(text, "voice", "incomplete", reply, adapt=False)
+
+        pending_whatsapp_reply = handle_pending_whatsapp_message(text)
+        if pending_whatsapp_reply:
+            speak(pending_whatsapp_reply)
+            return record_interaction(text, "whatsapp", "ok", pending_whatsapp_reply, adapt=False)
 
         natural_reply = handle_natural_conversation(text)
         if natural_reply:
@@ -3461,8 +3669,8 @@ def mobile_app():
 
 
 @app.get("/ask-star")
-def ask(q: str):
-    return {"reply": ask_star(q)}
+def ask(q: str, source: str = "api"):
+    return {"reply": ask_star(q, source=source)}
 
 
 @app.get("/memory")
@@ -3527,14 +3735,26 @@ def settings():
 
 @app.get("/voice/status")
 def voice_status():
+    runtime = runtime_status_payload()
     return {
         "settings": star_voice.get_settings(),
         "recognition_languages": star_voice.recognition_languages(),
         "last": star_voice.last_voice_state(),
         "is_speaking": is_speaking(),
+        "is_listening": listening_state()["active"],
+        "listening": listening_state(),
         "desktop_button_visible": desktop_button_visible(),
         "pending_confirmation": PENDING_CONFIRMATION["description"] if PENDING_CONFIRMATION else None,
+        **runtime,
     }
+
+
+@app.post("/voice/listening")
+def voice_listening(active: bool = False, mode: str = "idle"):
+    if active and not runtime_enabled():
+        active = False
+        mode = "idle"
+    return {"listening": update_listening_state(active, mode)}
 
 
 @app.get("/desktop-button/status")
@@ -3555,6 +3775,36 @@ def desktop_button_hide():
 @app.post("/desktop-button/toggle")
 def desktop_button_toggle():
     return {"visible": set_desktop_button_visible(not desktop_button_visible())}
+
+
+@app.get("/runtime/status")
+def runtime_status():
+    return runtime_status_payload()
+
+
+@app.post("/runtime/off")
+def runtime_off():
+    stop_speaking()
+    star_voice.set_voice_quiet(True)
+    set_runtime_enabled(False)
+    stop_wake_listener()
+    return {"status": "off", "voice_quiet": True, **runtime_status_payload()}
+
+
+@app.post("/runtime/on")
+def runtime_on():
+    set_runtime_enabled(True)
+    star_voice.set_voice_quiet(False)
+    started = start_wake_listener()
+    reply = "STAR runtime is on."
+    return {"status": "on" if started else "starting_failed", "voice_quiet": False, "reply": reply, **runtime_status_payload()}
+
+
+@app.post("/runtime/toggle")
+def runtime_toggle():
+    if runtime_enabled():
+        return runtime_off()
+    return runtime_on()
 
 
 @app.get("/voice/settings")
@@ -3625,13 +3875,16 @@ def voice_quiet():
 @app.post("/voice/resume")
 def voice_resume():
     star_voice.set_voice_quiet(False)
-    reply = "Theek hai bhai, ab main baat kar sakta hoon."
+    reply = "Okay, I can talk now."
     speak(reply)
     return {"status": "resumed", "voice_quiet": False, "reply": reply}
 
 
 @app.post("/voice/wake")
 def voice_wake():
+    if not runtime_enabled():
+        update_listening_state(False, "idle")
+        return {"status": "off", "spoken": False, "reply": ""}
     settings = star_voice.get_settings()
     if star_voice.is_voice_quiet(settings):
         star_voice.set_voice_quiet(False)

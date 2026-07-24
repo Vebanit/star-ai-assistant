@@ -191,6 +191,14 @@ h3 {
   border-color: rgba(180, 35, 24, 0.32);
 }
 
+.star-power-dock.listening {
+  border-color: rgba(27, 126, 180, 0.42);
+}
+
+.star-power-dock.speaking {
+  border-color: rgba(22, 116, 95, 0.52);
+}
+
 .power-label {
   display: block;
   color: var(--muted);
@@ -208,6 +216,14 @@ h3 {
 
 .star-power-dock.off #starPowerState {
   color: var(--danger);
+}
+
+.star-power-dock.listening #starPowerState {
+  color: #1b7eb4;
+}
+
+.star-power-dock.speaking #starPowerState {
+  color: var(--accent);
 }
 
 .power-button {

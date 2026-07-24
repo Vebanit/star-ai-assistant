@@ -19,6 +19,12 @@ SAD_SONGS = {
     ],
 }
 
+GENERIC_SONGS = [
+    ("Hindi hits mix", "https://www.youtube.com/results?search_query=popular+hindi+songs+playlist"),
+    ("English hits mix", "https://www.youtube.com/results?search_query=popular+english+songs+playlist"),
+    ("Lo-fi music live", "https://www.youtube.com/watch?v=jfKfPfyJRdk&autoplay=1"),
+]
+
 
 def play_pause():
     pyautogui.press("playpause")
@@ -49,6 +55,16 @@ def play_sad_song(language):
     title, video_id = random.choice(SAD_SONGS[clean_language])
     play_youtube_video(video_id)
     return f"Playing a {clean_language} sad song: {title}."
+
+
+def play_generic_song(query=None):
+    if query:
+        webbrowser.open(f"https://www.youtube.com/results?search_query={quote_plus(query + ' song')}")
+        return f"Playing songs for {query} on YouTube."
+
+    title, url = random.choice(GENERIC_SONGS)
+    webbrowser.open(url)
+    return f"Playing {title} on YouTube."
 
 
 def open_youtube(query=None):
@@ -108,7 +124,17 @@ def handle_media_command(command):
     if "vlc" in text:
         return open_vlc()
 
-    if any(phrase in text for phrase in ["play pause", "pause music", "play music", "pause media", "resume media"]):
+    if any(word in text for word in ["song", "gaana", "gana"]) and any(word in text for word in ["play", "chala", "chalao", "chalana", "baja", "lagao"]):
+        query = text
+        for phrase in ["play", "song", "songs", "gaana", "gana", "chalao", "chalana", "chala", "baja", "lagao", "please"]:
+            query = query.replace(phrase, " ")
+        query = " ".join(query.split())
+        return play_generic_song(query or None)
+
+    if "music" in text and any(word in text for word in ["play", "chala", "chalao", "chalana", "baja", "lagao"]):
+        return play_generic_song()
+
+    if any(phrase in text for phrase in ["play pause", "pause music", "pause media", "resume media"]):
         return play_pause()
 
     if any(phrase in text for phrase in ["next song", "next track", "next media"]):

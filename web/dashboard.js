@@ -244,7 +244,7 @@ function renderVoice(voice) {
   $("#responseLanguage").value = settings.response_language || "auto";
   $("#voiceMode").value = settings.voice_mode || "conversation";
   $("#wakeEngine").value = settings.wake_engine || "speech";
-  $("#wakePhrases").value = settings.wake_phrases || "hello star,hey star,star,sitar,sitara";
+  $("#wakePhrases").value = settings.wake_phrases || "hey star,hello star,star";
   $("#voiceTimeout").value = settings.voice_timeout || "5";
   $("#voicePhraseLimit").value = settings.voice_phrase_time_limit || "8";
   $("#voicePause").value = settings.voice_pause_threshold || "0.75";
@@ -260,6 +260,10 @@ function renderVoice(voice) {
     ["Wake", settings.wake_engine || "auto"],
     ["Language", settings.voice_language || "auto"],
     ["Reply", settings.response_language || "auto"],
+    ["Runtime", checked(voice.runtime_enabled ?? true) ? "on" : "off"],
+    ["Wake Listener", checked(voice.wake_listener_running) ? "running" : "stopped"],
+    ["Listening", voice.is_listening ? `${voice.listening?.mode || "active"}` : "idle"],
+    ["Speaking", voice.is_speaking ? "yes" : "no"],
     ["Fallback", (voice.recognition_languages || []).join(", ") || "en-IN, hi-IN, en-US"],
     ["Timeout", `${settings.voice_timeout || 5}s`],
     ["Phrase", `${settings.voice_phrase_time_limit || 6}s`],
@@ -284,12 +288,17 @@ function renderVoice(voice) {
 }
 
 function renderPowerDock(voice) {
-  const quiet = checked(voice.settings?.voice_quiet);
+  const runtimeOn = checked(voice.runtime_enabled ?? !checked(voice.settings?.voice_quiet));
+  const off = !runtimeOn;
   const desktopVisible = checked(voice.desktop_button_visible ?? true);
-  $("#starPowerDock").classList.toggle("off", quiet);
-  $("#starPowerState").textContent = quiet ? "OFF" : "ON";
-  $("#starPowerBtn").textContent = quiet ? "Turn On" : "Turn Off";
-  $("#starPowerBtn").title = quiet ? "Resume STAR replies. Server stays on." : "Put STAR in quiet mode. Server stays on.";
+  const listening = checked(voice.is_listening);
+  const speaking = checked(voice.is_speaking);
+  $("#starPowerDock").classList.toggle("off", off);
+  $("#starPowerDock").classList.toggle("listening", listening && !off && !speaking);
+  $("#starPowerDock").classList.toggle("speaking", speaking && !off);
+  $("#starPowerState").textContent = off ? "OFF" : speaking ? "SPEAKING" : listening ? "LISTENING" : "ON";
+  $("#starPowerBtn").textContent = off ? "Turn On" : "Turn Off";
+  $("#starPowerBtn").title = off ? "Start STAR runtime and wake listener." : "Stop STAR runtime and wake listener. Dashboard stays on.";
   $("#desktopButtonToggle").textContent = desktopVisible ? "Hide Button" : "Show Button";
   $("#desktopButtonToggle").title = desktopVisible ? "Remove the desktop floating button from the screen." : "Bring the desktop floating button back.";
 }
@@ -565,7 +574,7 @@ function bindEvents() {
 
   $("#starPowerBtn").addEventListener("click", async () => {
     const isOff = $("#starPowerDock").classList.contains("off");
-    const result = await api(isOff ? "/voice/resume" : "/voice/quiet", { method: "POST" });
+    const result = await api(isOff ? "/runtime/on" : "/runtime/off", { method: "POST" });
     if (result.reply) addMessage("assistant", result.reply);
     await refreshAll();
   });
